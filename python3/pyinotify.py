@@ -479,6 +479,11 @@ class _Event:
         @return: Generic event string representation.
         @rtype: str
         """
+        if field_name is not None:
+            try:
+                return self.__dict__[field_name]
+            except Exception as err:
+                print(err, file=sys.stderr)
         s = ''
         for attr, value in sorted(self.__dict__.items(), key=lambda x: x[0]):
             if attr.startswith('_'):
@@ -487,14 +492,14 @@ class _Event:
                 value = hex(getattr(self, attr))
             elif isinstance(value, str) and not value:
                 value = "''"
-            s += ' %s%s%s' % (output_format.field_name(attr),
-                              output_format.punctuation('='),
+            s += ' "%s"%s"%s",' % (output_format.field_name(attr),
+                              output_format.punctuation(':'),
                               output_format.field_value(value))
 
-        s = '%s%s%s %s' % (output_format.punctuation('<'),
+        s = '%s"%s":{%s}%s' % (output_format.punctuation('{'),
                            output_format.class_name(self.__class__.__name__),
-                           s,
-                           output_format.punctuation('>'))
+                           re.sub(',$','',s),
+                           output_format.punctuation('}'))
         return s
 
     def __str__(self):
@@ -1493,6 +1498,41 @@ class ThreadedNotifier(threading.Thread, Notifier):
         self.loop()
 
 
+try:
+    import asyncore
+    class AsyncNotifier(asyncore.file_dispatcher, Notifier):
+        """
+        This notifier inherits from asyncore.file_dispatcher in order to be able to
+        use pyinotify along with the asyncore framework.
+
+        """
+        def __init__(self, watch_manager, default_proc_fun=None, read_freq=0,
+                     threshold=0, timeout=None, channel_map=None):
+            """
+            Initializes the async notifier. The only additional parameter is
+            'channel_map' which is the optional asyncore private map. See
+            Notifier class for the meaning of the others parameters.
+
+            """
+            Notifier.__init__(self, watch_manager, default_proc_fun, read_freq,
+                              threshold, timeout)
+            asyncore.file_dispatcher.__init__(self, self._fd, channel_map)
+
+        def handle_read(self):
+            """
+            When asyncore tells us we can read from the fd, we proceed processing
+            events. This method can be overridden for handling a notification
+            differently.
+
+            """
+            self.read_events()
+            self.process_events()
+
+except ImportError:
+    # Won't work in Python 3.12+ unless a compatibility package is installed.
+    # Use AsyncioNotifier instead.
+    pass
+
 class TornadoAsyncNotifier(Notifier):
     """
     Tornado ioloop adapter.
@@ -1526,7 +1566,9 @@ class TornadoAsyncNotifier(Notifier):
 
     def handle_read(self, *args, **kwargs):
         """
-        See comment in AsyncNotifier.
+        When tornado tells us we can read from the fd, we proceed processing
+        events. This method can be overridden for handling a notification
+        differently.
 
         """
         self.read_events()
@@ -1564,7 +1606,6 @@ class AsyncioNotifier(Notifier):
     def stop(self):
         self.loop.remove_reader(self._fd)
         Notifier.stop(self)
-
     def handle_read(self, *args, **kwargs):
         self.read_events()
         self.process_events()
@@ -2235,10 +2276,10 @@ def command_line():
     By default the watched path is '/tmp' and all types of events are
     monitored. Events monitoring serves forever, type c^c to stop it.
     """
-    from optparse import OptionParser
 
     usage = "usage: %prog [options] [path1] [path2] [pathn]"
 
+    from optparse import OptionParser
     parser = OptionParser(usage=usage)
     parser.add_option("-v", "--verbose", action="store_true",
                       dest="verbose", help="Verbose mode")
@@ -2264,6 +2305,9 @@ def command_line():
     parser.add_option("-f", "--raw-format", action="store_true",
                       dest="raw_format",
                       help="Disable enhanced output format.")
+    parser.add_option("-n", "--field-name", action="store",
+                      dest="field_name",
+                      help="Get specific field name")
     parser.add_option("-c", "--command", action="store",
                       dest="command",
                       help="Shell command to run upon event")
@@ -2279,6 +2323,12 @@ def command_line():
     if not options.raw_format:
         global output_format
         output_format = ColoredOutputFormat()
+
+    global field_name
+    if options.field_name:
+        field_name = options.field_name
+    else:
+        field_name = None
 
     if len(args) < 1:
         path = '/tmp'  # default watched path
