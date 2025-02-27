@@ -1529,8 +1529,8 @@ try:
             self.process_events()
 
 except ImportError:
-    # Won't work in Python 3.12+ unless a compatibility package is installed.
-    # Use AsyncioNotifier instead.
+    # asyncore was removed in Python 3.12, but try the import instead of a
+    # version check in case the compatibility package is installed.
     pass
 
 class TornadoAsyncNotifier(Notifier):
