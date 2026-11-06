@@ -91,10 +91,10 @@ except ImportError:
 
 __author__ = "seb@dbzteam.org (Sebastien Martini)"
 
-__version__ = "0.9.6"
+__version__ = "0.9.7"
 
 
-# Compatibity mode: set to True to improve compatibility with
+# Compatibility mode: set to True to improve compatibility with
 # Pyinotify 0.7.1. Do not set this variable yourself, call the
 # function compatibility_mode() instead.
 COMPATIBILITY_MODE = False
@@ -969,7 +969,10 @@ class PrintAllEvents(ProcessEvent):
         """
         self._out.write(str(event))
         self._out.write('\n')
-        self._out.flush()
+        try:
+            self._out.flush()
+        except:
+            pass
 
 
 class ChainIfTrue(ProcessEvent):
@@ -1507,7 +1510,7 @@ try:
 
         """
         def __init__(self, watch_manager, default_proc_fun=None, read_freq=0,
-                     threshold=0, timeout=None, channel_map=None):
+                    threshold=0, timeout=None, channel_map=None):
             """
             Initializes the async notifier. The only additional parameter is
             'channel_map' which is the optional asyncore private map. See
@@ -1527,11 +1530,11 @@ try:
             """
             self.read_events()
             self.process_events()
-
 except ImportError:
     # asyncore was removed in Python 3.12, but try the import instead of a
     # version check in case the compatibility package is installed.
     pass
+
 
 class TornadoAsyncNotifier(Notifier):
     """
@@ -1606,6 +1609,7 @@ class AsyncioNotifier(Notifier):
     def stop(self):
         self.loop.remove_reader(self._fd)
         Notifier.stop(self)
+
     def handle_read(self, *args, **kwargs):
         self.read_events()
         self.process_events()
@@ -2319,6 +2323,7 @@ def command_line():
 
     if options.version:
         print(__version__)
+        sys.exit(0)
 
     if not options.raw_format:
         global output_format
