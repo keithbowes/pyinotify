@@ -99,6 +99,8 @@ __version__ = "0.9.7"
 # function compatibility_mode() instead.
 COMPATIBILITY_MODE = False
 
+field_name = None
+
 
 class InotifyBindingNotFoundError(PyinotifyError):
     """

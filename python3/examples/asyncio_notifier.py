@@ -1,4 +1,4 @@
-import pyinotify
+from pyinotify import pyinotify
 import asyncio
 
 
@@ -12,7 +12,13 @@ def handle_read_callback(notifier):
 
 
 wm = pyinotify.WatchManager()
-loop = asyncio.get_event_loop()
+
+try:
+    loop = asyncio.get_running_loop()
+except RuntimeError:
+    loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+
 notifier = pyinotify.AsyncioNotifier(wm, loop,
                                      callback=handle_read_callback)
 wm.add_watch('/tmp', pyinotify.ALL_EVENTS)
