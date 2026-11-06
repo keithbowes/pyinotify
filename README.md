@@ -8,8 +8,8 @@
 
 ## Dependencies
 
-* Linux ≥ 2.6.13
-* Python ≥ 2.4 (including Python 3.x)
+* Linux ≥ 2.6.13 or another *nix with inotify support
+* Python ≥ 3.0
 
 
 ## Install
@@ -19,21 +19,13 @@
     # To install pip follow http://www.pip-installer.org/en/latest/installing.html
     $ pip install pyinotify
 
-### Alternatively, Get the elephant fork
+### Alternatively, get the elephant fork
 
     $ pip install pyinotify-elephant-fork
 
-### Or install Pyinotify directly from source
+### Or install pyinotify directly from source
 
-#### Python 2
-
-    # Choose your Python interpreter: either python, python2.7,..
-    # Replacing XXX accordingly, type:
-    $ sudo pythonXXX setup.py install
-
-#### Python 3
-
-    $ python -m build -nwx
+    $ python -m build -nw
     $ pip install .
 
 ## Watch a directory
