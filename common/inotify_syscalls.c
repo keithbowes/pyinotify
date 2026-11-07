@@ -170,15 +170,6 @@ static PyMethodDef inotify_syscalls_functions[] = {
   {0}
 };
 
-/* python 2 */
-#if PY_MAJOR_VERSION < 3
-
-void initinotify_syscalls(void) {
-  Py_InitModule3("inotify_syscalls", inotify_syscalls_functions,
-                 "module inotify_syscalls");
-}
-
-#else  /* python 3 */
 
 static struct PyModuleDef inotify_syscallsmodule = {
   {}, /* m_base */
@@ -196,4 +187,3 @@ PyObject* PyInit_inotify_syscalls(void) {
   return PyModule_Create(&inotify_syscallsmodule);
 }
 
-#endif  /* PY_VERSION_HEX */
