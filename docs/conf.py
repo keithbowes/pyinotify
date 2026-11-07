@@ -1,5 +1,11 @@
 import datetime
+import os
 import sphinx_epytext
+import sys
+
+sys.path.insert(0, os.path.abspath('../python3'))
+import pyinotify
+
 # Configuration file for the Sphinx documentation builder.
 #
 # For the full list of built-in configuration values, see the documentation:
@@ -11,16 +17,16 @@ import sphinx_epytext
 project = 'pyinotify'
 author = 'Sebastien Martini'
 copyright = f'{datetime.datetime.now().year}, {author}'
-try:
-    import pyinotify
-    release = pyinotify.pyinotify.__version__
-except AttributeError:
-    release = 'master'
+release = pyinotify.__version__
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = []
+extensions = [
+'sphinx.ext.autodoc',
+# your other sphinx extensions
+# ...
+]
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
@@ -33,11 +39,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 html_theme = 'pyramid'
 html_static_path = ['_static']
 #
-extensions = [
-'sphinx.ext.autodoc',
-# your other sphinx extensions
-# ...
-]
+
 
 def setup(app):
     app.connect('autodoc-process-docstring', sphinx_epytext.process_docstring)

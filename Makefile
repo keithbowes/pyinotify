@@ -12,9 +12,7 @@ uninstall:
 	pip uninstall pyinotify
 
 doc: clean-doc
-# Must be installed before generating documentation
-	pip show pyinotify >/dev/null 2>&1 || $(MAKE) install
-	$(EPYDOC) $(SRCDOC) $(DSTDOC) || python -m pydoc -w pyinotify
+	$(EPYDOC) $(SRCDOC) $(DSTDOC) || python -m pydoc -w python3/pyinotify.py
 
 clean-doc:
 	rm -rf $(DSTDOC)

@@ -17,8 +17,8 @@ documentation for details.
 
 
 
-.. automodule:: pyinotify.pyinotify
+.. automodule:: pyinotify
    :members:
    :member-order: groupwise
    :show-inheritance:
-   
+
