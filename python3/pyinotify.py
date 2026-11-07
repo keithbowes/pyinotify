@@ -93,12 +93,6 @@ __author__ = "seb@dbzteam.org (Sebastien Martini)"
 
 __version__ = "0.9.7"
 
-
-# Compatibility mode: set to True to improve compatibility with
-# Pyinotify 0.7.1. Do not set this variable yourself, call the
-# function compatibility_mode() instead.
-COMPATIBILITY_MODE = False
-
 field_name = None
 
 
@@ -576,8 +570,6 @@ class Event(_Event):
         """
         _Event.__init__(self, raw)
         self.maskname = EventsCodes.maskname(self.mask)
-        if COMPATIBILITY_MODE:
-            self.event_name = self.maskname
         try:
             if self.name:
                 self.pathname = os.path.abspath(os.path.join(self.path,
@@ -846,8 +838,6 @@ class _SysProcessEvent(_ProcessEvent):
                  'path': watch_.path,
                  'name': raw_event.name,
                  'dir': dir_}
-        if COMPATIBILITY_MODE:
-            dict_['is_dir'] = dir_
         if to_append is not None:
             dict_.update(to_append)
         return Event(dict_)
@@ -2223,23 +2213,6 @@ class ColoredOutputFormat(RawOutputFormat):
              'blink': '\033[5m',
              'invert': '\033[7m'}
         RawOutputFormat.__init__(self, f)
-
-
-def compatibility_mode():
-    """
-    Use this function to turn on the compatibility mode. The compatibility
-    mode is used to improve compatibility with Pyinotify 0.7.1 (or older)
-    programs. The compatibility mode provides additional variables 'is_dir',
-    'event_name', 'EventsCodes.IN_*' and 'EventsCodes.ALL_EVENTS' as
-    Pyinotify 0.7.1 provided. Do not call this function from new programs!!
-    Especially if there are developped for Pyinotify >= 0.8.x.
-    """
-    setattr(EventsCodes, 'ALL_EVENTS', ALL_EVENTS)
-    for evname in globals():
-        if evname.startswith('IN_'):
-            setattr(EventsCodes, evname, globals()[evname])
-    global COMPATIBILITY_MODE
-    COMPATIBILITY_MODE = True
 
 
 def command_line():
