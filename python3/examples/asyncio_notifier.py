@@ -1,4 +1,4 @@
-from pyinotify import pyinotify
+import pyinotify
 import asyncio
 
 

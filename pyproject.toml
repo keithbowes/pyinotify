@@ -20,7 +20,7 @@ classifiers = [
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Natural Language :: English",
-    "Operating System :: POSIX :: FreeBSD",
+    "Operating System :: POSIX :: BSD :: FreeBSD",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
@@ -37,7 +37,7 @@ classifiers = [
     ]
 
 [project.scripts]
-pyinotify = "pyinotify.pyinotify:command_line"
+pyinotify = "pyinotify:command_line"
 
 [project.urls]
 Homepage = "https://github.com/lexdene/pyinotify"
