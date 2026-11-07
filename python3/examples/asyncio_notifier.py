@@ -1,6 +1,39 @@
 import pyinotify
 import asyncio
 
+class HandleEvents(pyinotify.ProcessEvent):
+    """
+    A minimal example of how to handle events.
+    """
+    def process_default(self, event):
+        event_handled = False
+
+        if event.mask & pyinotify.EventsCodes.OP_FLAGS['IN_OPEN']:
+            print("%s opened" % event.pathname)
+            event_handled = True
+        if event.mask & pyinotify.EventsCodes.OP_FLAGS['IN_CLOSE_WRITE'] or \
+            event.mask & pyinotify.EventsCodes.OP_FLAGS['IN_CLOSE_NOWRITE']:
+                print("%s closed" % event.pathname)
+                event_handled = True
+        if event.mask & pyinotify.EventsCodes.OP_FLAGS['IN_CREATE']:
+            print("%s was created" % event.pathname)
+            event_handled = True
+        if event.mask & pyinotify.EventsCodes.OP_FLAGS['IN_DELETE']:
+            print("%s was deleted" % event.pathname)
+            event_handled = True
+        if event.mask & pyinotify.EventsCodes.OP_FLAGS['IN_MODIFY']:
+            print("%s was modified" % event.pathname)
+            event_handled = True
+        if event.mask & pyinotify.EventsCodes.OP_FLAGS['IN_MOVED_FROM']:
+            print("%s moved" % event.pathname)
+            event_handled = True
+
+        if event_handled:
+            print("")
+            can_finish = True
+        else:
+            print("Unhandled event %s on %s" % (event.maskname, event.pathname))
+            print("")
 
 def handle_read_callback(notifier):
     """
@@ -20,7 +53,8 @@ except RuntimeError:
 asyncio.set_event_loop(loop)
 
 notifier = pyinotify.AsyncioNotifier(wm, loop,
-                                     callback=handle_read_callback)
+                                     callback=handle_read_callback,
+                                     default_proc_fun=HandleEvents())
 wm.add_watch('/tmp', pyinotify.ALL_EVENTS)
 loop.run_forever()
 notifier.stop()
