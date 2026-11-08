@@ -475,12 +475,13 @@ class _Event:
         @return: Generic event string representation.
         @rtype: str
         """
+        import json
         if field_name is not None:
             try:
                 return self.__dict__[field_name]
             except Exception as err:
                 print(err, file=sys.stderr)
-        s = ''
+        s = {}
         for attr, value in sorted(self.__dict__.items(), key=lambda x: x[0]):
             if attr.startswith('_'):
                 continue
@@ -488,15 +489,15 @@ class _Event:
                 value = hex(getattr(self, attr))
             elif isinstance(value, str) and not value:
                 value = "''"
-            s += ' "%s"%s"%s",' % (output_format.field_name(attr),
-                              output_format.punctuation(':'),
-                              output_format.field_value(value))
+            s.update({attr: value})
 
-        s = '%s"%s":{%s}%s' % (output_format.punctuation('{'),
-                           output_format.class_name(self.__class__.__name__),
-                           re.sub(',$','',s),
-                           output_format.punctuation('}'))
-        return s
+        s = {self.__class__.__name__: s}
+
+        try:
+            from pygments import highlight, lexers, formatters
+            return highlight(json.dumps(s), lexers.JsonLexer(ensurenl=False), formatters.Terminal256Formatter(style='rrt'))
+        except ImportError:
+            return json.dumps(s)
 
     def __str__(self):
         return repr(self)
