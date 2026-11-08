@@ -21,6 +21,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Natural Language :: English",
     "Operating System :: POSIX :: BSD :: FreeBSD",
+    "Operating System :: POSIX :: BSD :: OpenBSD",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
@@ -46,9 +47,9 @@ Wiki = "https://github.com/seb-m/pyinotify/wiki"
 
 [tool.setuptools]
 packages = ["pyinotify", "pyinotify.examples"]
-platforms = ["FreeBSD", "Linux"]
+platforms = ["FreeBSD", "Linux", "OpenBSD"]
 ext-modules = [
-    {name = "inotify_syscalls", sources = ["common/inotify_syscalls.c"], extra-compile-args = ["-fpic"]}
+    {name = "inotify_syscalls", sources = ["common/inotify_syscalls.c"]}
 ]
 
 [tool.setuptools.dynamic]
