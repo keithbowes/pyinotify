@@ -113,7 +113,7 @@ class INotifyWrapper:
     @staticmethod
     def create():
         """
-        Factory method instanciating and returning the right wrapper.
+        Factory method instantiating and returning the right wrapper.
         """
         # First, try to use ctypes.
         if ctypes:
@@ -328,9 +328,9 @@ class EventsCodes:
     @type IN_MODIFY: int
     @cvar IN_ATTRIB: Metadata changed.
     @type IN_ATTRIB: int
-    @cvar IN_CLOSE_WRITE: Writtable file was closed.
+    @cvar IN_CLOSE_WRITE: Writable file was closed.
     @type IN_CLOSE_WRITE: int
-    @cvar IN_CLOSE_NOWRITE: Unwrittable file closed.
+    @cvar IN_CLOSE_NOWRITE: Read-only file closed.
     @type IN_CLOSE_NOWRITE: int
     @cvar IN_OPEN: File was opened.
     @type IN_OPEN: int
@@ -382,7 +382,7 @@ class EventsCodes:
         'IN_MODIFY'        : 0x00000002,  # File was modified
         'IN_ATTRIB'        : 0x00000004,  # Metadata changed
         'IN_CLOSE_WRITE'   : 0x00000008,  # Writable file was closed
-        'IN_CLOSE_NOWRITE' : 0x00000010,  # Unwritable file closed
+        'IN_CLOSE_NOWRITE' : 0x00000010,  # Read-only file closed
         'IN_OPEN'          : 0x00000020,  # File was opened
         'IN_MOVED_FROM'    : 0x00000040,  # File was moved from X
         'IN_MOVED_TO'      : 0x00000080,  # File was moved to Y
@@ -578,7 +578,7 @@ class Event(_Event):
             else:
                 self.pathname = os.path.abspath(self.path)
         except AttributeError as err:
-            # Usually it is not an error some events are perfectly valids
+            # Usually it is not an error. Some events are perfectly valid
             # despite the lack of these attributes.
             log.debug(err)
 
@@ -676,7 +676,7 @@ class _SysProcessEvent(_ProcessEvent):
     def process_IN_CREATE(self, raw_event):
         """
         If the event affects a directory and the auto_add flag of the
-        targetted watch is set to True, a new watch is added on this
+        targeted watch is set to True, a new watch is added on this
         new directory, with the same attribute values than those of
         this watch.
         """
@@ -751,7 +751,7 @@ class _SysProcessEvent(_ProcessEvent):
             to_append['src_pathname'] = mv_[0]
         elif (raw_event.mask & IN_ISDIR and watch_.auto_add and
               not watch_.exclude_filter(dst_path)):
-            # We got a diretory that's "moved in" from an unknown source and
+            # We got a directory that's "moved in" from an unknown source and
             # auto_add is enabled. Manually add watches to the inner subtrees.
             # The newly monitored directory inherits attributes from its
             # parent directory.
@@ -830,7 +830,7 @@ class _SysProcessEvent(_ProcessEvent):
         """
         watch_ = self._watch_manager.get_watch(raw_event.wd)
         if raw_event.mask & (IN_DELETE_SELF | IN_MOVE_SELF):
-            # Unfornulately this information is not provided by the kernel
+            # Unfortunately this information is not provided by the kernel
             dir_ = watch_.dir
         else:
             dir_ = bool(raw_event.mask & IN_ISDIR)
@@ -847,7 +847,7 @@ class _SysProcessEvent(_ProcessEvent):
 class ProcessEvent(_ProcessEvent):
     """
     Process events objects, can be specialized via subclassing, thus its
-    behavior can be overriden:
+    behavior can be overridden:
 
     Note: you should not override __init__ in your subclass instead define
     a my_init() method, this method will be called automatically from the
@@ -898,7 +898,7 @@ class ProcessEvent(_ProcessEvent):
         stop_chaining = False
         if self.pevent is not None:
             # By default methods return None so we set as guideline
-            # that methods asking for stop chaining must explicitely
+            # that methods asking for stop chaining must explicitly
             # return non None or non False values, otherwise the default
             # behavior will be to accept chain call to the corresponding
             # local method.
@@ -911,7 +911,7 @@ class ProcessEvent(_ProcessEvent):
 
     def process_IN_Q_OVERFLOW(self, event):
         """
-        By default this method only reports warning messages, you can overredide
+        By default this method only reports warning messages, you can override
         it by subclassing ProcessEvent and implement your own
         process_IN_Q_OVERFLOW method. The actions you can take on receiving this
         event is either to update the variable max_queued_events in order to
@@ -1123,7 +1123,7 @@ class Notifier:
         # Poll object and registration
         self._pollobj = select.poll()
         self._pollobj.register(self._fd, select.POLLIN)
-        # This pipe is correctely initialized and used by ThreadedNotifier
+        # This pipe is correctly initialized and used by ThreadedNotifier
         self._pipe = (-1, -1)
         # Event queue
         self._eventq = deque()
@@ -1156,11 +1156,11 @@ class Notifier:
 
     def coalesce_events(self, coalesce=True):
         """
-        Coalescing events. Events are usually processed by batchs, their size
+        Coalescing events. Events are usually processed in batches, their size
         depend on various factors. Thus, before processing them, events received
         from inotify are aggregated in a fifo queue. If this coalescing
         option is enabled events are filtered based on their unicity, only
-        unique events are enqueued, doublons are discarded. An event is unique
+        unique events are enqueued, duplicates are discarded. An event is unique
         when the combination of its fields (wd, mask, cookie, name) is unique
         among events of a same batch. After a batch of events is processed any
         events is accepted again. By default this option is disabled, you have
@@ -1179,7 +1179,7 @@ class Notifier:
         milliseconds.
 
         @param timeout: If specified it overrides the corresponding instance
-                        attribute _timeout. timeout must be sepcified in
+                        attribute _timeout. timeout must be specified in
                         milliseconds.
         @type timeout: int
 
@@ -1235,7 +1235,7 @@ class Notifier:
             # Retrieve name
             bname, = struct.unpack('%ds' % fname_len,
                                    r[rsum + s_size:rsum + s_size + fname_len])
-            # FIXME: should we explictly call sys.getdefaultencoding() here ??
+            # FIXME: should we explicitly call sys.getdefaultencoding() here ??
             uname = bname.decode()
             rawevent = _RawEvent(wd, mask, cookie, uname)
             if self._coalesce:
@@ -1251,8 +1251,8 @@ class Notifier:
     def process_events(self):
         """
         Routine for processing events from queue by calling their
-        associated proccessing method (an instance of ProcessEvent).
-        It also does internal processings, to keep the system updated.
+        associated processing method (an instance of ProcessEvent).
+        It also does internal processing, to keep the system updated.
         """
         while self._eventq:
             raw_event = self._eventq.popleft()  # pop next event
@@ -1264,13 +1264,13 @@ class Notifier:
                 if not (raw_event.mask & IN_IGNORED):
                     # Not really sure how we ended up here, nor how we should
                     # handle these types of events and if it is appropriate to
-                    # completly skip them (like we are doing here).
+                    # completely skip them (like we are doing here).
                     log.warning("Unable to retrieve Watch object associated to %s",
                                 repr(raw_event))
                 continue
-            revent = self._sys_proc_fun(raw_event)  # system processings
+            revent = self._sys_proc_fun(raw_event)  # system processing
             if watch_ and watch_.proc_fun:
-                watch_.proc_fun(revent)  # user processings
+                watch_.proc_fun(revent)  # user processing
             else:
                 self._default_proc_fun(revent)
         self._sys_proc_fun.cleanup()  # remove olds MOVED_* events records
@@ -1407,7 +1407,7 @@ class Notifier:
 
 class ThreadedNotifier(threading.Thread, Notifier):
     """
-    This notifier inherits from threading.Thread for instanciating a separate
+    This notifier inherits from threading.Thread for instantiating a separate
     thread, and also inherits from Notifier, because it is a threaded notifier.
 
     Note that every functionality provided by this class is also provided
@@ -1664,7 +1664,7 @@ class ExcludeFilter:
         lst = []
         with open(filename, 'r') as file_obj:
             for line in file_obj.readlines():
-                # Trim leading an trailing whitespaces
+                # Trim leading and trailing whitespace
                 pattern = line.strip()
                 if not pattern or pattern.startswith('#'):
                     continue
@@ -1709,7 +1709,7 @@ class WatchManager:
     """
     Provide operations for watching files and directories. Its internal
     dictionary is used to reference watched items. When used inside
-    threaded code, one must instanciate as many WatchManager instances as
+    threaded code, one must instantiate as many WatchManager instances as
     there are ThreadedNotifier instances.
 
     """
@@ -1746,7 +1746,7 @@ class WatchManager:
         After a call to this method the WatchManager's instance become useless
         and cannot be reused, a new instance must then be instanciated. It
         makes sense to call this method in few situations for instance if
-        several independant WatchManager must be instanciated or if all watches
+        several independent WatchManager must be instantiated or if all watches
         must be removed and no other watches need to be added.
         """
         os.close(self._fd)
@@ -1795,7 +1795,7 @@ class WatchManager:
         """
         Format path to its internal (stored in watch manager) representation.
         """
-        # path must be a unicode string (str) and is just normalized.
+        # path must be a Unicode string (str) and is just normalized.
         return os.path.normpath(path)
 
     def __add_watch(self, path, mask, proc_fun, auto_add, exclude_filter):
@@ -1811,7 +1811,7 @@ class WatchManager:
             return wd
         watch = Watch(wd=wd, path=path, mask=mask, proc_fun=proc_fun,
                       auto_add=auto_add, exclude_filter=exclude_filter)
-        # wd are _always_ indexed with their original unicode paths in wmd.
+        # wd are _always_ indexed with their original Unicode paths in wmd.
         self._wmd[wd] = watch
         log.debug('New %s', watch)
         return wd
@@ -1829,7 +1829,7 @@ class WatchManager:
         Add watch(s) on the provided |path|(s) with associated |mask| flag
         value and optionally with a processing |proc_fun| function and
         recursive flag |rec| set to True.
-        All |path| components _must_ be str (i.e. unicode) objects.
+        All |path| components _must_ be str (i.e. Unicode) objects.
         If |path| is already watched it is ignored, but if it is called with
         option rec=True a watch is put on each one of its not-watched
         subdirectory.
@@ -1848,8 +1848,8 @@ class WatchManager:
         @type rec: bool
         @param auto_add: Automatically add watches on newly created
                          directories in watched parent |path| directory.
-                         If |auto_add| is True, IN_CREATE is ored with |mask|
-                         when the watch is added.
+                         If |auto_add| is True, IN_CREATE is used in a
+                         bitmask with |mask| when the watch is added.
         @type auto_add: bool
         @param do_glob: Do globbing on pathname (see standard globbing
                         module for more informations).
@@ -1864,7 +1864,7 @@ class WatchManager:
                                the class' constructor.
         @type exclude_filter: callable object
         @return: dict of paths associated to watch descriptors. A wd value
-                 is positive if the watch was added sucessfully, otherwise
+                 is positive if the watch was added successfully, otherwise
                  the value is negative. If the path was invalid or was already
                  watched it is not included into this returned dictionary.
         @rtype: dict of {str: int}
@@ -1876,7 +1876,7 @@ class WatchManager:
 
         # normalize args as list elements
         for npath in self.__format_param(path):
-            # Require that path be a unicode string
+            # Require that path be a Unicode string
             if not isinstance(npath, str):
                 ret_[path] = -3
                 continue
@@ -1899,7 +1899,7 @@ class WatchManager:
                             else:
                                 raise WatchManagerError(err, ret_)
                     else:
-                        # Let's say -2 means 'explicitely excluded
+                        # Let's say -2 means 'explicitly excluded
                         # from watching'.
                         ret_[rpath] = -2
         return ret_
