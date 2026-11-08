@@ -7,7 +7,7 @@ all:
 	python -m build -nw
 
 install: all
-	pip install .
+	pip install . $(INSTALL_ARGS)
 
 uninstall:
 	pip uninstall pyinotify
@@ -25,3 +25,9 @@ clean: clean-doc
 		-name '*.pyo' \) \
 		-print -exec rm {} \;
 	rm -rf build dist pyinotify.egg-info
+
+test: all install
+	python3 python3/pyinotify.py --version
+	pyinotify --version
+	python3 -m pyinotify --version
+	python3 python3/examples/asyncio_notifier.py
