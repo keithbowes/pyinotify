@@ -3,4 +3,5 @@ include COPYING
 include MANIFEST.in
 include README.md
 recursive-include common *
+recursive-include old *
 recursive-include python3 *
