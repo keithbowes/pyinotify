@@ -497,12 +497,13 @@ class _Event:
             s.update({attr: value})
 
         s = {self.__class__.__name__: s}
+        json_str = json.dumps(s, ensure_ascii=False)
 
         try:
             from pygments import highlight, lexers, formatters
-            return highlight(json.dumps(s), lexers.JsonLexer(ensurenl=False), formatters.Terminal256Formatter(style='rrt'))
+            return highlight(json_str, lexers.JsonLexer(ensurenl=False), formatters.Terminal256Formatter(style='rrt'))
         except ImportError:
-            return json.dumps(s)
+            return json_str
 
     def __str__(self):
         return repr(self)
@@ -1480,7 +1481,7 @@ class ThreadedNotifier(threading.Thread, Notifier):
         # When the loop must be terminated .stop() is called, 'stop'
         # is written to pipe fd so poll() returns and .check_events()
         # returns False which make evaluate the While's stop condition
-        # ._stop_event.isSet() wich put an end to the thread's execution.
+        # ._stop_event.isSet() which put an end to the thread's execution.
         while not self._stop_event.isSet():
             self.process_events()
             ref_time = time.time()

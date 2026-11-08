@@ -7,25 +7,25 @@ class HandleEvents(pyinotify.ProcessEvent):
     """
     def process_default(self, event):
         event_handled = False
+        pathname = event.pathname
 
-        if event.mask & pyinotify.EventsCodes.OP_FLAGS['IN_OPEN']:
-            print("%s opened" % event.pathname)
+        if event.mask & pyinotify.IN_OPEN:
+            print(f"{pathname} opened")
             event_handled = True
-        if event.mask & pyinotify.EventsCodes.OP_FLAGS['IN_CLOSE_WRITE'] or \
-            event.mask & pyinotify.EventsCodes.OP_FLAGS['IN_CLOSE_NOWRITE']:
-                print("%s closed" % event.pathname)
-                event_handled = True
-        if event.mask & pyinotify.EventsCodes.OP_FLAGS['IN_CREATE']:
-            print("%s was created" % event.pathname)
+        if event.mask & pyinotify.IN_CLOSE_WRITE or event.mask & pyinotify.IN_CLOSE_NOWRITE:
+            print(f"{pathname} closed")
             event_handled = True
-        if event.mask & pyinotify.EventsCodes.OP_FLAGS['IN_DELETE']:
-            print("%s was deleted" % event.pathname)
+        if event.mask & pyinotify.IN_CREATE:
+            print(f"{pathname} was created")
             event_handled = True
-        if event.mask & pyinotify.EventsCodes.OP_FLAGS['IN_MODIFY']:
-            print("%s was modified" % event.pathname)
+        if event.mask & pyinotify.IN_DELETE:
+            print(f"{pathname} was deleted")
             event_handled = True
-        if event.mask & pyinotify.EventsCodes.OP_FLAGS['IN_MOVED_FROM']:
-            print("%s moved" % event.pathname)
+        if event.mask & pyinotify.IN_MODIFY:
+            print(f"{pathname} was modified")
+            event_handled = True
+        if event.mask & pyinotify.IN_MOVED_FROM:
+            print(f"{pathname} moved")
             event_handled = True
 
         if event_handled:

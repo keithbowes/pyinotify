@@ -20,6 +20,7 @@ classifiers = [
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Natural Language :: English",
+    "Operating System :: MacOS :: MacOS X",
     "Operating System :: POSIX :: BSD :: FreeBSD",
     "Operating System :: POSIX :: BSD :: OpenBSD",
     "Operating System :: POSIX :: Linux",
@@ -47,7 +48,7 @@ Wiki = "https://github.com/seb-m/pyinotify/wiki"
 
 [tool.setuptools]
 packages = ["pyinotify", "pyinotify.examples"]
-platforms = ["FreeBSD", "Linux", "OpenBSD"]
+platforms = ["FreeBSD", "Linux", "MacOSX", "OpenBSD"]
 ext-modules = [
     {name = "inotify_syscalls", sources = ["common/inotify_syscalls.c"]}
 ]
