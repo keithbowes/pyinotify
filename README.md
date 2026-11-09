@@ -26,8 +26,7 @@
 
 ### Or install pyinotify directly from source
 
-    $ python -m build -nw
-    $ pip install .
+    $ make install
 
 ## Watch a directory
 

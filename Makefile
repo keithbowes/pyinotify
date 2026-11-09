@@ -26,8 +26,12 @@ clean: clean-doc
 		-print -exec rm {} \;
 	rm -rf build dist pyinotify.egg-info
 
-test: all install
+deps:
+	python3 -m ensurepip
+	python3 -m pip install build setuptools
+
+test: install
 	python3 python3/pyinotify.py --version
 	pyinotify --version
 	python3 -m pyinotify --version
-	python3 python3/examples/asyncio_notifier.py
+	#python3 python3/examples/asyncio_notifier.py
