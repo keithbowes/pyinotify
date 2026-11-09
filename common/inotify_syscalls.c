@@ -108,7 +108,11 @@
 #  define __NR_inotify_add_watch	285
 #  define __NR_inotify_rm_watch		286
 # else
-#  error "Unsupported architecture!"
+/* Unsupported platform, but don't conk out, for the libc inotify can possibly
+ * still be used. */
+#  define __NR_inotify_init		0
+#  define __NR_inotify_add_watch	0
+#  define __NR_inotify_rm_watch		0
 # endif
 #endif
 

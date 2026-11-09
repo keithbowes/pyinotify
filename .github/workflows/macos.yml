@@ -1,0 +1,32 @@
+# Test installation on MacOS.
+name: macOS
+
+on: [push, pull_request]
+
+env:
+  EXTRA_CFLAGS: "-pipe"
+
+jobs:
+  test:
+    name: Build on macOS
+    runs-on: macos-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@eb02c69dbabdb66ff183c614f4ce7ab3c077592c
+
+      - name: Install dependencies
+        run: brew install python
+
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Run Tests
+        run: |
+          python3 -m venv $(pwd)/venv
+          . $(pwd)/venv/bin/activate
+          make deps
+          make test
