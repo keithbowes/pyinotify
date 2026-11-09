@@ -1,8 +1,8 @@
 EPYDOC=sphinx-build
-DSTDOC=$(SRCDOC)/html
+DSTDOC=python3/docs/html
 SRCDOC=docs
 
-all:
+all: doc
 	if test "$$(uname -s)" = "OpenBSD"; then export LDFLAGS="$${LDFLAGS} -L$${LOCALBASE:-/usr/local}/lib/inotify/ -linotify"; fi; \
 	python -m build -nw
 
@@ -28,7 +28,7 @@ clean: clean-doc
 
 deps:
 	python3 -m ensurepip
-	python3 -m pip install build setuptools
+	python3 -m pip install build setuptools Sphinx
 
 test: install
 	python3 python3/pyinotify.py --version
@@ -39,5 +39,4 @@ test: install
 	if test "$$(uname)" != "OpenBSD"; then python3 python3/examples/asyncio_notifier.py & fi
 	sleep 3
 	touch /tmp/foo
-	sleep 2
 	rm -f /tmp/foo

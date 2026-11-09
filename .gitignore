@@ -11,7 +11,7 @@
 *.bak
 a.out
 *.out
-docs/html/
+python3/docs/html/
 build/
 dist/
 pyinotify.egg-info/
