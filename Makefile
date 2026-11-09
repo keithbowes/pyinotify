@@ -3,7 +3,6 @@ DSTDOC=python3/docs/html
 SRCDOC=docs
 
 all: doc
-	if test "$$(uname -s)" = "OpenBSD"; then export LDFLAGS="$${LDFLAGS} -L$${LOCALBASE:-/usr/local}/lib/inotify/ -linotify"; fi; \
 	python -m build -nw
 
 install: all

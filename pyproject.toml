@@ -49,9 +49,6 @@ Wiki = "https://github.com/seb-m/pyinotify/wiki"
 [tool.setuptools]
 packages = ["pyinotify", "pyinotify.examples"]
 platforms = ["FreeBSD", "Linux", "MacOSX", "OpenBSD"]
-ext-modules = [
-    {name = "inotify_syscalls", sources = ["common/inotify_syscalls.c"]}
-]
 
 [tool.setuptools.dynamic]
 version = {attr = "python3.pyinotify.__version__"}

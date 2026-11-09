@@ -76,21 +76,10 @@ import glob
 import locale
 import subprocess
 
-try:
-    from functools import reduce
-except ImportError:
-    pass  # Will fail on Python 2.4 which has reduce() builtin anyway.
+from functools import reduce
 
-try:
-    import ctypes
-    import ctypes.util
-except ImportError:
-    ctypes = None
-
-try:
-    import inotify_syscalls
-except ImportError:
-    inotify_syscalls = None
+import ctypes
+import ctypes.util
 
 
 field_name = None
@@ -113,18 +102,11 @@ class INotifyWrapper:
     @staticmethod
     def create():
         """
-        Factory method instantiating and returning the right wrapper.
+        Factory method instantiating and returning the wrapper.
         """
-        # First, try to use ctypes.
-        if ctypes:
-            inotify = _CtypesLibcINotifyWrapper()
-            if inotify.init():
-                return inotify
-        # Second, see if C extension is compiled.
-        if inotify_syscalls:
-            inotify = _INotifySyscallsWrapper()
-            if inotify.init():
-                return inotify
+        inotify = _CtypesLibcINotifyWrapper()
+        if inotify.init():
+            return inotify
 
     def get_errno(self):
         """
@@ -151,51 +133,12 @@ class INotifyWrapper:
         return self._inotify_rm_watch(fd, wd)
 
 
-class _INotifySyscallsWrapper(INotifyWrapper):
-    def __init__(self):
-        # Stores the last errno value.
-        self._last_errno = None
-
-    def init(self):
-        assert inotify_syscalls
-        return True
-
-    def _get_errno(self):
-        return self._last_errno
-
-    def _inotify_init(self):
-        try:
-            fd = inotify_syscalls.inotify_init()
-        except IOError as err:
-            self._last_errno = err.errno
-            return -1
-        return fd
-
-    def _inotify_add_watch(self, fd, pathname, mask):
-        try:
-            wd = inotify_syscalls.inotify_add_watch(fd, pathname, mask)
-        except IOError as err:
-            self._last_errno = err.errno
-            return -1
-        return wd
-
-    def _inotify_rm_watch(self, fd, wd):
-        try:
-            ret = inotify_syscalls.inotify_rm_watch(fd, wd)
-        except IOError as err:
-            self._last_errno = err.errno
-            return -1
-        return ret
-
-
 class _CtypesLibcINotifyWrapper(INotifyWrapper):
     def __init__(self):
         self._libc = None
         self._get_errno_func = None
 
     def init(self):
-        assert ctypes
-
         try_libc_name = 'c'
         if sys.platform.startswith('freebsd'):
             try_libc_name = 'inotify'
@@ -1723,8 +1666,7 @@ class WatchManager:
         """
         Initialization: init inotify, init watch manager dictionary.
         Raise OSError if initialization fails, raise InotifyBindingNotFoundError
-        if no inotify binding was found (through ctypes or from direct access to
-        syscalls).
+        if the inotify binding wasn't found.
 
         @param exclude_filter: boolean function, returns True if current
                                path must be excluded from being watched.
