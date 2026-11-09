@@ -1,0 +1,34 @@
+# Test installation on Linux.
+name: freebsd
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    name: Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    env:
+      # Force Node 24 until github-actions-cpu-cores gets a new release
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v7
+
+    - name: run-tests
+      uses: vmactions/freebsd-vm@v1
+      with:
+        usesh: true
+        prepare: |
+          pkg update
+          pkg install -y python311
+          ln -sf /usr/local/bin/python3.11 /usr/local/bin/python3
+        run: |
+          python3 -m venv $(pwd)/venv
+          . $(pwd)/venv/bin/activate
+          make deps
+          make test
+

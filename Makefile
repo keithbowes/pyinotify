@@ -34,4 +34,8 @@ test: install
 	python3 python3/pyinotify.py --version
 	pyinotify --version
 	python3 -m pyinotify --version
-	#python3 python3/examples/asyncio_notifier.py
+	mkdir -p /tmp
+	python3 python3/examples/asyncio_notifier.py &
+	sleep 5s
+	touch /tmp/foo
+	rm -f /tmp/foo
