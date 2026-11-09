@@ -34,7 +34,7 @@ test: install
 	pyinotify --version
 	python3 -m pyinotify --version
 	mkdir -p /tmp
-	python3/examples/threaded_notifier.py &
+	python3 python3/examples/threaded_notifier.py &
 	sleep 3
 	touch /tmp/foo
 	rm -f /tmp/foo
