@@ -140,7 +140,7 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
 
     def init(self):
         try_libc_name = 'c'
-        if sys.platform.startswith('freebsd'):
+        if sys.platform.startswith('freebsd') or sys.platform.startswith('darwin'):
             try_libc_name = 'inotify'
 
         libc_name = None

@@ -18,8 +18,16 @@ jobs:
         id: set-up-homebrew
         uses: Homebrew/actions/setup-homebrew@eb02c69dbabdb66ff183c614f4ce7ab3c077592c
 
+      - name: Setup up nixpkgs
+        uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
       - name: Install dependencies
-        run: brew install python
+        run: |
+          brew install python
+          nix-build
+          nix-env -i libinotify-kqueue -f '<nixpkgs>'
 
       - name: Checkout Code
         uses: actions/checkout@v7
