@@ -28,6 +28,10 @@ pyinotify
 @contact: seb@dbzteam.org
 """
 
+__author__ = "seb@dbzteam.org (Sebastien Martini)"
+
+__version__ = "0.10.0"
+
 class PyinotifyError(Exception):
     """Indicates exceptions raised by a Pyinotify class."""
     pass
@@ -88,10 +92,6 @@ try:
 except ImportError:
     inotify_syscalls = None
 
-
-__author__ = "seb@dbzteam.org (Sebastien Martini)"
-
-__version__ = "0.9.7"
 
 field_name = None
 
@@ -501,7 +501,7 @@ class _Event:
 
         try:
             from pygments import highlight, lexers, formatters
-            return highlight(json_str, lexers.JsonLexer(ensurenl=False), formatters.Terminal256Formatter(style='rrt'))
+            return highlight(json_str, lexers.JsonLexer(ensurenl=False), formatters.Terminal256Formatter(style=(os.getenv('PYINOTIFY_STYLE') or 'rrt')))
         except ImportError:
             return json_str
 

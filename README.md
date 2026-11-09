@@ -26,7 +26,7 @@
 
 ### Or install pyinotify directly from source
 
-    $ make install
+    $ make deps install
 
 ## Watch a directory
 
