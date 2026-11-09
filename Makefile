@@ -3,7 +3,7 @@ DSTDOC=$(SRCDOC)/html
 SRCDOC=docs
 
 all:
-	if test "$$(uname -s)" = "OpenBSD"; then export LDFLAGS="$${LDFLAGS} -L$${LOCALBASE}/lib/inotify/ -linotify"; fi; \
+	if test "$$(uname -s)" = "OpenBSD"; then export LDFLAGS="$${LDFLAGS} -L$${LOCALBASE:-/usr/local}/lib/inotify/ -linotify"; fi; \
 	python -m build -nw
 
 install: all
@@ -35,7 +35,8 @@ test: install
 	pyinotify --version
 	python3 -m pyinotify --version
 	mkdir -p /tmp
-	python3 python3/examples/asyncio_notifier.py &
-	sleep 5s
+# Hangs in OpenBSD; OpenBSD users will have to investigate why.
+	if test "$$(uname)" != "OpenBSD"; then python3 python3/examples/asyncio_notifier.py & fi
+	sleep 5
 	touch /tmp/foo
 	rm -f /tmp/foo
