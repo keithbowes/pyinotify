@@ -34,8 +34,7 @@ test: install
 	pyinotify --version
 	python3 -m pyinotify --version
 	mkdir -p /tmp
-# Hangs in OpenBSD; OpenBSD users will have to investigate why.
-	if test "$$(uname)" != "OpenBSD"; then python3 python3/examples/asyncio_notifier.py & fi
+	python3/examples/threaded_notifier.py &
 	sleep 3
 	touch /tmp/foo
 	rm -f /tmp/foo
