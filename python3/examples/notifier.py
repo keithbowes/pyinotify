@@ -31,7 +31,6 @@ class HandleEvents(pyinotify.ProcessEvent):
 
         if event_handled:
             print("")
-            can_finish = True
         else:
             print(f"Unhandled event {event.maskname} on {event.pathname}")
             print("")
@@ -50,7 +49,6 @@ def handle_read_callback(notifier):
 wm = pyinotify.WatchManager()
 
 notifier = pyinotify.Notifier(wm,
-                              timeout=10000,
                               default_proc_fun=HandleEvents())
 wm.add_watch('/tmp', pyinotify.ALL_EVENTS)
 notifier.loop(callback=handle_read_callback)

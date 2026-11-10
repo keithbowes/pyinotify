@@ -29,7 +29,6 @@ class HandleEvents(pyinotify.ProcessEvent):
 
         if event_handled:
             print("")
-            can_finish = True
         else:
             print(f"Unhandled event {event.maskname} on {event.pathname}")
             print("")
@@ -39,7 +38,7 @@ class HandleEvents(pyinotify.ProcessEvent):
 wm = pyinotify.WatchManager()
 notifier = pyinotify.ThreadedNotifier(wm,
                                      default_proc_fun=HandleEvents())
-wm.add_watch('/tmp', pyinotify.ALL_EVENTS)
 notifier.start()
+wm.add_watch('/tmp', pyinotify.ALL_EVENTS)
 notifier.join(timeout=60) # Wait for events up to a minute
 notifier.stop()

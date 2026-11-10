@@ -30,7 +30,6 @@ class HandleEvents(pyinotify.ProcessEvent):
 
         if event_handled:
             print("")
-            can_finish = True
         else:
             print(f"Unhandled event {event.maskname} on {event.pathname}")
             print("")
