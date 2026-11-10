@@ -144,7 +144,7 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
         if sys.platform.startswith('linux'):
             # Native support. Skip.
             pass
-        elif sys.platform.startswith('freebsd') and os.uname().release >= 14.4:
+        elif sys.platform.startswith('freebsd') and float(re.match(r'^\d+\.\d+', os.uname().release).group()) >= 14.4:
             # FreeBSD 14.4+ have native inotify support so don't use the
             # libinotify shim in those versions.
             pass
@@ -155,10 +155,12 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
         try:
             libc_name = ctypes.util.find_library(self.try_libc_name)
         except (OSError, IOError):
-            # Special handling for OpenBSD where the library is
-            # installed in a subdirectory.
-            if sys.platform.startswith('openbsd'):
-                libc_name = '/usr/local/lib/inotify/libinotify.so'
+            pass
+
+        # Special handling for OpenBSD where the library is
+        # installed in a subdirectory.
+        if sys.platform.startswith('openbsd'):
+            libc_name = '/usr/local/lib/inotify/libinotify.so'
 
         self._libc = ctypes.CDLL(libc_name, use_errno=True)
         self._get_errno_func = ctypes.get_errno
@@ -185,12 +187,16 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
     def _inotify_init(self):
         assert self._libc is not None
         IN_CLOEXEC = 0o2000000
+        IN_DIRECT = 0x80000000
         IN_NONBLOCK = 0o0004000
         flags = IN_CLOEXEC | IN_NONBLOCK
         if self.try_libc_name == 'inotify':
-            IN_DIRECT = 0x80000000
             flags |= IN_DIRECT
-        return self._libc.inotify_init1(flags)
+        fd = self._libc.inotify_init1(flags)
+        if fd < 0:
+            # Old versions of libinotify without IN_DIRECT
+            fd = self._libc.inotify_init1(flags & ~IN_DIRECT)
+        return fd
 
     def _inotify_add_watch(self, fd, pathname, mask):
         assert self._libc is not None
@@ -448,7 +454,7 @@ class _Event:
             if attr == 'mask':
                 value = hex(getattr(self, attr))
             elif isinstance(value, str) and not value:
-                value = "''"
+                value = ""
             s.update({attr: value})
 
         s = {self.__class__.__name__: s}
@@ -1175,7 +1181,10 @@ class Notifier:
         """
         buf_ = array.array('i', [0])
         # get event queue size
-        if fcntl.ioctl(self._fd, termios.FIONREAD, buf_, 1) == -1:
+        try:
+            if fcntl.ioctl(self._fd, termios.FIONREAD, buf_, 1) == -1:
+                return
+        except OSError:
             return
         queue_size = buf_[0]
         if queue_size < self._threshold:

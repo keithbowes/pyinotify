@@ -2,13 +2,13 @@
 name: linux
 on: [push, pull_request]
 jobs:
-    test:
+    test-linux:
         runs-on: ubuntu-latest
         container: alpine:edge
         steps:
             - name: packages
               run: |
-                apk add gcc make musl-dev python3 python3-dev
+                apk add make python3
             # actions/checkout@v7 clones the repository
             - uses: actions/checkout@v7
             - name: run-tests

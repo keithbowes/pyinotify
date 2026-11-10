@@ -7,7 +7,7 @@ env:
   EXTRA_CFLAGS: "-pipe"
 
 jobs:
-  test:
+  test-macos:
     name: Build on macOS
     runs-on: macos-latest
     permissions:
@@ -17,14 +17,6 @@ jobs:
       - name: Set up Homebrew
         id: set-up-homebrew
         uses: Homebrew/actions/setup-homebrew@eb02c69dbabdb66ff183c614f4ce7ab3c077592c
-
-      - name: Set up up Nix
-        uses: cachix/install-nix-action@v31
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
-        run: |
-          nix-build
-          nix-shell --run 'echo OK'
 
       - name: Install dependencies
         run: |
@@ -36,17 +28,14 @@ jobs:
           brew install libinotify && got_libinotify=1 || true
           if test -z "$got_libinotify";
           then
-            nix-env -i libinotify -f '<nixpkgs>' && got_libinotify=1 || true
-          fi
-          if test -z "$got_libinotify";
-          then
-            brew install autoconf automake git
+            brew install autoconf automake git libtool
             git clone --depth=1 https://github.com/libinotify-kqueue/libinotify-kqueue
             cd libinotify-kqueue
+            export CFLAGS="-g -O2 -Wno-unguarded-availability-new"
             autoreconf -fvi
             ./configure
             make
-            make install
+            sudo make install
           fi
 
       - name: Checkout Code

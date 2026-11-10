@@ -9,8 +9,14 @@
 
 ## Dependencies
 
-* Linux ≥ 2.6.27 or another *nix with inotify support
 * Python ≥ 3.0
+* One of the following systems:
+
+    * A Linux distro running Linux ≥ 2.6.27.
+    * FreeBSD  ≥ 14.4.
+    * MacOS X or a BSD distribution (including versions of FreeBSD older than 14.3) with
+      [libinotify](https://github.com/libinotify-kqueue/libinotify-kqueue). The GitHub actions don't
+      detect any events but it might work on your computer.
 
 
 ## Install

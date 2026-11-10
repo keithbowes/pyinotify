@@ -4,7 +4,7 @@ name: freebsd
 on: [push, pull_request]
 
 jobs:
-  test:
+  test-freebsd:
     name: Build
     runs-on: ubuntu-latest
     permissions:
