@@ -443,8 +443,11 @@ class _Event:
         json_str = json.dumps(s, ensure_ascii=False)
 
         try:
-            from pygments import highlight, lexers, formatters
-            return highlight(json_str, lexers.JsonLexer(ensurenl=False), formatters.Terminal256Formatter(style=(os.getenv('PYINOTIFY_STYLE') or 'rrt')))
+            if isinstance(output_format, ColoredOutputFormat):
+                from pygments import highlight, lexers, formatters
+                return highlight(json_str, lexers.JsonLexer(ensurenl=False), formatters.Terminal256Formatter(style=(os.getenv('PYINOTIFY_STYLE') or 'rrt')))
+            elif isinstance(output_format, RawOutputFormat):
+                return json_str
         except ImportError:
             return json_str
 
