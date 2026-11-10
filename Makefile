@@ -36,6 +36,6 @@ test: install
 	mkdir -p /tmp
 	python3 python3/examples/threaded_notifier.py &
 	sleep 3
-	touch /tmp/foo
-	mv /tmp/foo /tmp/bar
-	rm -f /tmp/bar
+	touch $${TMPDIR:-/tmp}/foo
+	mv $${TMPDIR:-/tmp}/foo $${TMPDIR:-/tmp}/bar
+	rm -f $${TMPDIR:-/tmp}/bar

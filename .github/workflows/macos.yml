@@ -18,9 +18,36 @@ jobs:
         id: set-up-homebrew
         uses: Homebrew/actions/setup-homebrew@eb02c69dbabdb66ff183c614f4ce7ab3c077592c
 
+      - name: Set up up Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+        run: |
+          nix-build
+          nix-shell --run 'echo OK'
+
       - name: Install dependencies
         run: |
           brew install python
+
+      - name: Get libinotify
+        run: |
+          unset got_libinotify
+          brew install libinotify && got_libinotify=1 || true
+          if test -z "$got_libinotify";
+          then
+            nix-env -i libinotify -f '<nixpkgs>' && got_libinotify=1 || true
+          fi
+          if test -z "$got_libinotify";
+          then
+            brew install autoconf automake git
+            git clone --depth=1 https://github.com/libinotify-kqueue/libinotify-kqueue
+            cd libinotify-kqueue
+            autoreconf -fvi
+            ./configure
+            make
+            make install
+          fi
 
       - name: Checkout Code
         uses: actions/checkout@v7

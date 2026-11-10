@@ -139,26 +139,32 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
         self._get_errno_func = None
 
     def init(self):
-        try_libc_name = 'c'
-        if sys.platform.startswith('freebsd') or sys.platform.startswith('darwin'):
-            try_libc_name = 'inotify'
+        # Get the proper inotify library
+        self.try_libc_name = 'c'
+        if sys.platform.startswith('linux'):
+            # Native support. Skip.
+            pass
+        elif sys.platform.startswith('freebsd') and os.uname().release >= 14.4:
+            # FreeBSD 14.4+ have native inotify support so don't use the
+            # libinotify shim in those versions.
+            pass
+        elif re.match('^.+bsd.*$', sys.platform) or sys.platform.startswith('darwin'):
+            self.try_libc_name = 'inotify'
 
         libc_name = None
         try:
-            libc_name = ctypes.util.find_library(try_libc_name)
+            libc_name = ctypes.util.find_library(self.try_libc_name)
         except (OSError, IOError):
-            pass  # Will attempt to load it with None anyway.
-
-        # Special handling for OpenBSD where the library is
-        # installed in a subdirectory.
-        if sys.platform.startswith('openbsd'):
-            libc_name = '/usr/local/lib/inotify/libinotify.so'
+            # Special handling for OpenBSD where the library is
+            # installed in a subdirectory.
+            if sys.platform.startswith('openbsd'):
+                libc_name = '/usr/local/lib/inotify/libinotify.so'
 
         self._libc = ctypes.CDLL(libc_name, use_errno=True)
         self._get_errno_func = ctypes.get_errno
 
         # Eventually check that libc has needed inotify bindings.
-        if (not hasattr(self._libc, 'inotify_init') or
+        if (not hasattr(self._libc, 'inotify_init1') or
             not hasattr(self._libc, 'inotify_add_watch') or
             not hasattr(self._libc, 'inotify_rm_watch')):
             return False
@@ -178,7 +184,13 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
 
     def _inotify_init(self):
         assert self._libc is not None
-        return self._libc.inotify_init()
+        IN_CLOEXEC = 0o2000000
+        IN_NONBLOCK = 0o0004000
+        flags = IN_CLOEXEC | IN_NONBLOCK
+        if self.try_libc_name == 'inotify':
+            IN_DIRECT = 0x80000000
+            flags |= IN_DIRECT
+        return self._libc.inotify_init1(flags)
 
     def _inotify_add_watch(self, fd, pathname, mask):
         assert self._libc is not None
@@ -2228,7 +2240,7 @@ def command_line():
         field_name = None
 
     if len(args) < 1:
-        path = '/tmp'  # default watched path
+        path = (os.getenv('TMPDIR') or '/tmp')  # default watched path
     else:
         path = args
 

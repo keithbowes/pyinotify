@@ -9,7 +9,7 @@
 
 ## Dependencies
 
-* Linux ≥ 2.6.13 or another *nix with inotify support
+* Linux ≥ 2.6.27 or another *nix with inotify support
 * Python ≥ 3.0
 
 
