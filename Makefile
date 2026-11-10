@@ -37,4 +37,5 @@ test: install
 	python3 python3/examples/threaded_notifier.py &
 	sleep 3
 	touch /tmp/foo
-	rm -f /tmp/foo
+	mv /tmp/foo /tmp/bar
+	rm -f /tmp/bar

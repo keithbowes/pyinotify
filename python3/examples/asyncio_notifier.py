@@ -32,7 +32,7 @@ class HandleEvents(pyinotify.ProcessEvent):
             print("")
             can_finish = True
         else:
-            print("Unhandled event %s on %s" % (event.maskname, event.pathname))
+            print(f"Unhandled event {event.maskname} on {event.pathname}")
             print("")
 
 def handle_read_callback(notifier):

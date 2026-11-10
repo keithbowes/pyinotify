@@ -31,7 +31,7 @@ class HandleEvents(pyinotify.ProcessEvent):
             print("")
             can_finish = True
         else:
-            print("Unhandled event %s on %s" % (event.maskname, event.pathname))
+            print(f"Unhandled event {event.maskname} on {event.pathname}")
             print("")
         notifier._stop_event.set() # Exit when the first event(s) come in
 
