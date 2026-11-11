@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # pyinotify.py - python interface to inotify
 # Copyright (c) 2005-2015 Sebastien Martini <seb@dbzteam.org>
@@ -42,27 +42,8 @@ class PyinotifyError(Exception):
     pass
 
 
-class UnsupportedPythonVersionError(PyinotifyError):
-    """
-    Raised on unsupported Python versions.
-    """
-    def __init__(self, version):
-        """
-        @param version: Current Python version
-        @type version: string
-        """
-        PyinotifyError.__init__(self,
-                                ('Python %s is unsupported, requires '
-                                 'at least Python 3.0') % version)
-
-
-# Check Python version
-import sys
-if sys.version_info < (3, 0):
-    raise UnsupportedPythonVersionError(sys.version)
-
-
 # Import directives
+import sys
 import threading
 import os
 import select
