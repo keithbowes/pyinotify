@@ -32,6 +32,11 @@ __author__ = "seb@dbzteam.org (Sebastien Martini)"
 
 __version__ = "0.10.0"
 
+# Global variable so that libinotify won't create a new file descriptor each time one is needed.
+# Doesn't prevent more than one descriptor being created by the WatchManager() class.
+inotify_fd = 0
+
+
 class PyinotifyError(Exception):
     """Indicates exceptions raised by a Pyinotify class."""
     pass
@@ -120,8 +125,8 @@ class INotifyWrapper:
             return 'Errno: no errno support'
         return 'Errno=%s (%s)' % (os.strerror(code), errno.errorcode[code])
 
-    def inotify_init(self):
-        return self._inotify_init()
+    def inotify_init(self, new_fd = True):
+        return self._inotify_init(new_fd)
 
     def inotify_add_watch(self, fd, pathname, mask):
         # Unicode strings must be encoded to string prior to calling this
@@ -171,8 +176,8 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
             not hasattr(self._libc, 'inotify_rm_watch')):
             return False
 
-        self._libc.inotify_init.argtypes = []
-        self._libc.inotify_init.restype = ctypes.c_int
+        self._libc.inotify_init1.argtypes = [ctypes.c_int]
+        self._libc.inotify_init1.restype = ctypes.c_int
         self._libc.inotify_add_watch.argtypes = [ctypes.c_int, ctypes.c_char_p,
                                                  ctypes.c_uint32]
         self._libc.inotify_add_watch.restype = ctypes.c_int
@@ -184,19 +189,26 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
         assert self._get_errno_func
         return self._get_errno_func()
 
-    def _inotify_init(self):
+    def _inotify_init(self, new_fd):
         assert self._libc is not None
+        if not new_fd:
+            global inotify_fd
+            if inotify_fd:
+                return inotify_fd
         IN_CLOEXEC = 0o2000000
-        IN_DIRECT = 0x80000000
+        # IN_DIRECT is libinotify-only and requires using
+        # libinotify_direct_readv() and libinotify_direct_close() to work;
+        # users on platforms that use libinotify can try to implement it, as it
+        # should provide much better performance.
+        IN_DIRECT = 0x80000000 
         IN_NONBLOCK = 0o0004000
         flags = IN_CLOEXEC | IN_NONBLOCK
         if self.try_libc_name == 'inotify':
             flags |= IN_DIRECT
-        fd = self._libc.inotify_init1(flags)
-        if fd < 0:
-            # Old versions of libinotify without IN_DIRECT
-            fd = self._libc.inotify_init1(flags & ~IN_DIRECT)
-        return fd
+        _fd = self._libc.inotify_init1(flags & ~IN_DIRECT)
+        if not new_fd:
+            inotify_fd = _fd
+        return _fd
 
     def _inotify_add_watch(self, fd, pathname, mask):
         assert self._libc is not None
@@ -238,7 +250,15 @@ class ProcINotify:
       - Update max_queued_events attribute: max_queued_events.value = 42
     """
     def __init__(self, attr):
-        self._base = "/proc/sys/fs/inotify"
+        self.inotify = INotifyWrapper().create()
+        if self.inotify.try_libc_name == 'inotify':
+            self.inotify.inotify_init(new_fd = False)
+            # Default values from libinotify
+            self.max_queued_events = 16384
+            self.max_user_instances = 2147483646
+            self.max_user_watches = self.max_queued_events
+        else:
+            self._base = "/proc/sys/fs/inotify"
         self._attr = attr
 
     def get_val(self):
@@ -249,8 +269,11 @@ class ProcINotify:
         @rtype: int
         @raise IOError: if corresponding file in /proc/sys cannot be read.
         """
-        with open(os.path.join(self._base, self._attr), 'r') as file_obj:
-            return int(file_obj.readline())
+        if self.inotify.try_libc_name == 'inotify':
+            return int(getattr(self, self._attr))
+        else:
+            with open(os.path.join(self._base, self._attr), 'r') as file_obj:
+                return int(file_obj.readline())
 
     def set_val(self, nval):
         """
@@ -260,8 +283,20 @@ class ProcINotify:
         @type nval: int
         @raise IOError: if corresponding file in /proc/sys cannot be written.
         """
-        with open(os.path.join(self._base, self._attr), 'w') as file_obj:
-            file_obj.write(str(nval) + '\n')
+        if self.inotify.try_libc_name == 'inotify':
+            setattr(self, self._attr, nval)
+            if self._attr == 'max_user_watches':
+                # No equivalent for libinotify; users can change the value but it won't do anything.
+                return
+            IN_MAX_QUEUED_EVENTS = 1
+            IN_MAX_USER_INSTANCES = 2
+            _map = {'max_queued_events': IN_MAX_QUEUED_EVENTS, 'max_user_instances': IN_MAX_USER_INSTANCES}
+            self.inotify._libc.libinotify_set_param.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int]
+            self.inotify._libc.libinotify_set_param.restype = ctypes.c_int
+            self.inotify._libc.libinotify_set_param(inotify_fd, _map[self._attr], nval)
+        else:
+            with open(os.path.join(self._base, self._attr), 'w') as file_obj:
+                file_obj.write(str(nval) + '\n')
 
     value = property(get_val, set_val)
 
@@ -1864,8 +1899,8 @@ class WatchManager:
                                                             exclude_filter)
                         if wd < 0:
                             err = ('add_watch: cannot watch %s WD=%d, %s' % \
-                                       (rpath, wd,
-                                        self._inotify_wrapper.str_errno()))
+                                    (rpath, wd,
+                                     self._inotify_wrapper.str_errno()))
                             if quiet:
                                 log.error(err)
                             else:
@@ -1907,8 +1942,8 @@ class WatchManager:
                 cur = iwd[1].path
                 pref = os.path.commonprefix([root, cur])
                 if root == os.sep or (len(pref) == lend and \
-                                      len(cur) > lend and \
-                                      cur[lend] == os.sep):
+                        len(cur) > lend and \
+                        cur[lend] == os.sep):
                     yield iwd[1].wd
 
     def update_watch(self, wd, mask=None, proc_fun=None, rec=False,
@@ -1962,7 +1997,7 @@ class WatchManager:
                 if wd_ < 0:
                     ret_[awd] = False
                     err = ('update_watch: cannot update %s WD=%d, %s' % \
-                               (apath, wd_, self._inotify_wrapper.str_errno()))
+                            (apath, wd_, self._inotify_wrapper.str_errno()))
                     if quiet:
                         log.error(err)
                         continue
@@ -2072,7 +2107,7 @@ class WatchManager:
             if wd_ < 0:
                 ret_[awd] = False
                 err = ('rm_watch: cannot remove WD=%d, %s' % \
-                           (awd, self._inotify_wrapper.str_errno()))
+                        (awd, self._inotify_wrapper.str_errno()))
                 if quiet:
                     log.error(err)
                     continue
@@ -2212,8 +2247,8 @@ def command_line():
     parser.add_option("-e", "--events-list", metavar="EVENT[,...]",
                       dest="events_list",
                       help=("A comma-separated list of events to watch for - "
-                           "see the documentation for valid options (defaults"
-                           " to everything)"))
+                            "see the documentation for valid options (defaults"
+                            " to everything)"))
     parser.add_option("-s", "--stats", action="store_true",
                       dest="stats",
                       help="Display dummy statistics")

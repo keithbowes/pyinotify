@@ -33,7 +33,7 @@ test: install
 	python3 python3/pyinotify.py --version
 	pyinotify --version
 	python3 -m pyinotify --version
-	mkdir -p /tmp
+	mkdir -p $${TMPDIR:-/tmp}
 	python3 python3/examples/threaded_notifier.py &
 	sleep 3
 	touch $${TMPDIR:-/tmp}/foo

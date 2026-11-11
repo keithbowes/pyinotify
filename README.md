@@ -12,11 +12,13 @@
 * Python ≥ 3.0
 * One of the following systems:
 
-    * A Linux distro running Linux ≥ 2.6.27.
+    * A Linux distro running Linux ≥ 2.6.27 (Linux 2.6.27 was released in 2008, so all Linux users
+      surely have a compatible version).
     * FreeBSD  ≥ 14.4.
-    * MacOS X or a BSD distribution (including versions of FreeBSD older than 14.3) with
-      [libinotify](https://github.com/libinotify-kqueue/libinotify-kqueue). The GitHub actions don't
-      detect any events but it might work on your computer.
+    * MacOS X or a BSD distribution (including versions of FreeBSD below 14.3) with
+      [libinotify](https://github.com/libinotify-kqueue/libinotify-kqueue) 20211018 or higher. See
+      libinotify's GitHub page for an overview of its limitations compared to native support in
+      Linux and FreeBSD.
 
 
 ## Install
