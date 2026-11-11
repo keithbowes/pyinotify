@@ -32,10 +32,6 @@ __author__ = "seb@dbzteam.org (Sebastien Martini)"
 
 __version__ = "0.10.0"
 
-# Global variable so that libinotify won't create a new file descriptor each time one is needed.
-# Doesn't prevent more than one descriptor being created by the WatchManager() class.
-inotify_fd = 0
-
 
 class PyinotifyError(Exception):
     """Indicates exceptions raised by a Pyinotify class."""
@@ -106,8 +102,8 @@ class INotifyWrapper:
             return 'Errno: no errno support'
         return 'Errno=%s (%s)' % (os.strerror(code), errno.errorcode[code])
 
-    def inotify_init(self, new_fd = True):
-        return self._inotify_init(new_fd)
+    def inotify_init(self):
+        return self._inotify_init()
 
     def inotify_add_watch(self, fd, pathname, mask):
         # Unicode strings must be encoded to string prior to calling this
@@ -141,6 +137,8 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
         try:
             libc_name = ctypes.util.find_library(self.try_libc_name)
         except (OSError, IOError):
+            # If no binding is found, InotifyBindingNotFoundError()
+            # will be raised in WatchManager() after the additional checks below.
             pass
 
         # Special handling for OpenBSD where the library is
@@ -170,12 +168,8 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
         assert self._get_errno_func
         return self._get_errno_func()
 
-    def _inotify_init(self, new_fd):
+    def _inotify_init(self):
         assert self._libc is not None
-        if not new_fd:
-            global inotify_fd
-            if inotify_fd:
-                return inotify_fd
         IN_CLOEXEC = 0o2000000
         # IN_DIRECT is libinotify-only and requires using
         # libinotify_direct_readv() and libinotify_direct_close() to work;
@@ -186,10 +180,7 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
         flags = IN_CLOEXEC | IN_NONBLOCK
         if self.try_libc_name == 'inotify':
             flags |= IN_DIRECT
-        _fd = self._libc.inotify_init1(flags & ~IN_DIRECT)
-        if not new_fd:
-            inotify_fd = _fd
-        return _fd
+        return self._libc.inotify_init1(flags & ~IN_DIRECT)
 
     def _inotify_add_watch(self, fd, pathname, mask):
         assert self._libc is not None
@@ -230,10 +221,10 @@ class ProcINotify:
       - Read max_queued_events attribute: myvar = max_queued_events.value
       - Update max_queued_events attribute: max_queued_events.value = 42
     """
-    def __init__(self, attr):
-        self.inotify = INotifyWrapper().create()
+    def __init__(self, attr, inotify, fd):
+        self.inotify = inotify
+        self._fd = fd
         if self.inotify.try_libc_name == 'inotify':
-            self.inotify.inotify_init(new_fd = False)
             # Default values from libinotify
             self.max_queued_events = 16384
             self.max_user_instances = 2147483646
@@ -274,7 +265,7 @@ class ProcINotify:
             _map = {'max_queued_events': IN_MAX_QUEUED_EVENTS, 'max_user_instances': IN_MAX_USER_INSTANCES}
             self.inotify._libc.libinotify_set_param.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int]
             self.inotify._libc.libinotify_set_param.restype = ctypes.c_int
-            self.inotify._libc.libinotify_set_param(inotify_fd, _map[self._attr], nval)
+            self.inotify._libc.libinotify_set_param(self._fd, _map[self._attr], nval)
         else:
             with open(os.path.join(self._base, self._attr), 'w') as file_obj:
                 file_obj.write(str(nval) + '\n')
@@ -283,19 +274,6 @@ class ProcINotify:
 
     def __repr__(self):
         return '<%s=%d>' % (self._attr, self.get_val())
-
-
-# Inotify's variables
-#
-# Note: may raise IOError if the corresponding value in /proc/sys
-#       cannot be accessed.
-#
-# Examples:
-#  - read: myvar = max_queued_events.value
-#  - update: max_queued_events.value = 42
-#
-for attrname in ('max_queued_events', 'max_user_instances', 'max_user_watches'):
-    globals()[attrname] = ProcINotify(attrname)
 
 
 class EventsCodes:
@@ -1726,6 +1704,19 @@ class WatchManager:
         if self._fd < 0:
             err = 'Cannot initialize new instance of inotify, %s'
             raise OSError(err % self._inotify_wrapper.str_errno())
+
+        # Inotify's variables
+        #
+        # Note: may raise IOError if the corresponding value in /proc/sys
+        #       cannot be accessed.
+        #
+        # Examples:
+        #  - read: myvar = max_queued_events.value
+        #  - update: max_queued_events.value = 42
+        #
+        for attrname in ('max_queued_events', 'max_user_instances', 'max_user_watches'):
+            setattr(self, attrname, ProcINotify(attrname, self._inotify_wrapper, self._fd))
+
 
     def close(self):
         """
