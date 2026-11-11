@@ -36,10 +36,18 @@ class HandleEvents(pyinotify.ProcessEvent):
         notifier._stop_event.set() # Exit when the first event(s) come in
 
 
+tmpdir = (os.getenv('TMPDIR') or 'tmp')
+
+if os.getenv('TEST'):
+    open(f"{tmpdir}/.notifier_started", mode='w').close()
+
 wm = pyinotify.WatchManager()
 notifier = pyinotify.ThreadedNotifier(wm,
                                      default_proc_fun=HandleEvents())
 notifier.start()
-wm.add_watch((os.getenv('TMPDIR') or '/tmp'), pyinotify.ALL_EVENTS)
+wm.add_watch(tmpdir, pyinotify.ALL_EVENTS)
 notifier.join(timeout=60) # Wait for events up to a minute
 notifier.stop()
+
+if os.getenv('TEST'):
+    open(f"{tmpdir}/.notifier_finished", mode='w').close()

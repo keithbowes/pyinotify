@@ -147,7 +147,7 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
         # Get the proper inotify library
         self.try_libc_name = 'c'
         if sys.platform.startswith('linux'):
-            # Native support. Skip.
+            # Native support. Skip having to do the regexp below.
             pass
         elif sys.platform.startswith('freebsd') and float(re.match(r'^\d+\.\d+', os.uname().release).group()) >= 14.4:
             # FreeBSD 14.4+ have native inotify support so don't use the
