@@ -1208,25 +1208,24 @@ class Notifier:
         """
         Read events from device, build _RawEvents, and enqueue them.
         """
-        buf_ = array.array('i', [0])
-        # get event queue size
-        try:
-            if fcntl.ioctl(self._fd, termios.FIONREAD, buf_, 1) == -1:
-                return
-        except OSError:
-            return
-        queue_size = buf_[0]
-        if queue_size < self._threshold:
-            log.debug('(fd: %d) %d bytes available to read but threshold is '
-                      'fixed to %d bytes', self._fd, queue_size,
-                      self._threshold)
-            return
-        log.debug('Event queue size: %d', queue_size)
-
         try:
             # Read content from file
             inotify = self._watch_manager._inotify_wrapper
             if inotify.try_libc_name != 'inotify' or not inotify.has_direct_mode:
+                buf_ = array.array('i', [0])
+                # get event queue size
+                try:
+                    if fcntl.ioctl(self._fd, termios.FIONREAD, buf_, 1) == -1:
+                        return
+                except OSError:
+                    return
+                queue_size = buf_[0]
+                if queue_size < self._threshold:
+                    log.debug('(fd: %d) %d bytes available to read but threshold is '
+                              'fixed to %d bytes', self._fd, queue_size,
+                              self._threshold)
+                    return
+
                 r = os.read(self._fd, queue_size)
                 rsum = 0  # counter
                 while rsum < queue_size:
@@ -1248,9 +1247,12 @@ class Notifier:
                     else:
                         self._eventq.append(rawevent)
                     rsum += s_size + fname_len
+
+                log.debug('Event queue size: %d', queue_size)
             else:
+                MAX_EVENTS = 255
                 events = ctypes.pointer(ctypes.pointer(iovec()))
-                num_events = inotify._libc.libinotify_direct_readv(self._fd, events, queue_size, 0)
+                num_events = inotify._libc.libinotify_direct_readv(self._fd, events, MAX_EVENTS, 0)
                 log.debug(f"Number of events: {num_events}")
                 for i in range(0, num_events):
                     j = 0
