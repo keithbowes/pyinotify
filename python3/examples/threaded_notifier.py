@@ -36,7 +36,7 @@ class HandleEvents(pyinotify.ProcessEvent):
         notifier._stop_event.set() # Exit when the first event(s) come in
 
 
-tmpdir = (os.getenv('TMPDIR') or 'tmp')
+tmpdir = (os.getenv('TMPDIR') or '/tmp')
 
 if os.getenv('TEST'):
     open(f"{tmpdir}/.notifier_started", mode='w').close()

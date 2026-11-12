@@ -10,6 +10,7 @@ jobs:
   test-macos:
     name: Build on macOS
     runs-on: macos-latest
+    timeout-minutes: 300
     permissions:
       contents: read
 

@@ -66,13 +66,32 @@ import ctypes.util
 
 field_name = None
 
+# Flags for inotify_init1()
+IN_CLOEXEC = 0o2000000
+IN_DIRECT = 0x80000000 # libinotify open
+IN_NONBLOCK = 0o0004000
+
+# Things for libinotify directmode
+class inotify_event(ctypes.Structure):
+    _fields_ = [('wd', ctypes.c_int), ('mask', ctypes.c_uint32), ('cookie', ctypes.c_uint32), ('len', ctypes.c_uint32), ('name', ctypes.c_char_p)]
+    wd = 0
+    mask = 0
+    cookie = 0
+    len = 0
+    name = ''
+
+class iovec(ctypes.Structure):
+    _fields_ = [('iov_base', inotify_event), ('iov_len', ctypes.c_size_t)]
+    iov_base = None
+    iov_len = 0
+
 
 class InotifyBindingNotFoundError(PyinotifyError):
     """
     Raised when no inotify support couldn't be found.
     """
     def __init__(self):
-        err = "Couldn't find any inotify binding"
+        err = "Couldn't find any inotify binding. If you use MacOS or a BSD be sure that libinotify is installed."
         PyinotifyError.__init__(self, err)
 
 
@@ -162,6 +181,31 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
         self._libc.inotify_add_watch.restype = ctypes.c_int
         self._libc.inotify_rm_watch.argtypes = [ctypes.c_int, ctypes.c_int]
         self._libc.inotify_rm_watch.restype = ctypes.c_int
+
+        self.has_direct_mode = False
+        if self.try_libc_name == 'inotify':
+            if not hasattr(self._libc, 'libinotify_set_param'):
+                if hasattr(self._libc, 'inotify_set_param'):
+                    self._libc.libinotify.set_param = self._libc.inotify_set_param
+                else:
+                    return False
+
+            self._libc.libinotify_set_param.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int]
+            self._libc.libinotify_set_param.restype = ctypes.c_int
+
+            self.has_direct_mode = ((hasattr(self._libc, 'libinotify_direct_readv') and
+                                     hasattr(self._libc, 'libinotify_direct_close') and
+                                     hasattr(self._libc, 'libinotify_free_iovec')))
+
+            if self.has_direct_mode:
+                self._libc.libinotify_direct_close.argtypes = [ctypes.c_int]
+                self._libc.libinotify_direct_close.restype = ctypes.c_int
+
+                self._libc.libinotify_direct_readv.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.POINTER(iovec)), ctypes.c_int, ctypes.c_int]
+                self._libc.libinotify_direct_readv.restype = ctypes.c_int
+
+                self._libc.libinotify_free_iovec.argtypes = [ctypes.POINTER(iovec)]
+                self._libc.libinotify_free_iovec.restype = None
         return True
 
     def _get_errno(self):
@@ -170,17 +214,10 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
 
     def _inotify_init(self):
         assert self._libc is not None
-        IN_CLOEXEC = 0o2000000
-        # IN_DIRECT is libinotify-only and requires using
-        # libinotify_direct_readv() and libinotify_direct_close() to work;
-        # users on platforms that use libinotify can try to implement it, as it
-        # should provide much better performance.
-        IN_DIRECT = 0x80000000 
-        IN_NONBLOCK = 0o0004000
         flags = IN_CLOEXEC | IN_NONBLOCK
         if self.try_libc_name == 'inotify':
             flags |= IN_DIRECT
-        return self._libc.inotify_init1(flags & ~IN_DIRECT)
+        return self._libc.inotify_init1(flags)
 
     def _inotify_add_watch(self, fd, pathname, mask):
         assert self._libc is not None
@@ -263,8 +300,6 @@ class ProcINotify:
             IN_MAX_QUEUED_EVENTS = 1
             IN_MAX_USER_INSTANCES = 2
             _map = {'max_queued_events': IN_MAX_QUEUED_EVENTS, 'max_user_instances': IN_MAX_USER_INSTANCES}
-            self.inotify._libc.libinotify_set_param.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int]
-            self.inotify._libc.libinotify_set_param.restype = ctypes.c_int
             self.inotify._libc.libinotify_set_param(self._fd, _map[self._attr], nval)
         else:
             with open(os.path.join(self._base, self._attr), 'w') as file_obj:
@@ -469,7 +504,7 @@ class _Event:
 
 class _RawEvent(_Event):
     """
-    Raw event, it contains only the informations provided by the system.
+    Raw event, it contains only the information provided by the system.
     It doesn't infer anything.
     """
     def __init__(self, wd, mask, cookie, name):
@@ -505,7 +540,7 @@ class _RawEvent(_Event):
 
 class Event(_Event):
     """
-    This class contains all the useful informations about the observed
+    This class contains all the useful information about the observed
     event. However, the presence of each field is not guaranteed and
     depends on the type of event. In effect, some fields are irrelevant
     for some kind of event (for example 'cookie' is meaningless for
@@ -734,7 +769,7 @@ class _SysProcessEvent(_ProcessEvent):
         were moved, so we had to update its path, but under some circumstances
         it was impossible: if its parent directory and its destination
         directory wasn't watched. The kernel (see include/linux/fsnotify.h)
-        doesn't bring us enough informations like the destination path of
+        doesn't bring us enough information like the destination path of
         moved items.
         """
         watch_ = self._watch_manager.get_watch(raw_event.wd)
@@ -1186,34 +1221,60 @@ class Notifier:
                       'fixed to %d bytes', self._fd, queue_size,
                       self._threshold)
             return
+        log.debug('Event queue size: %d', queue_size)
 
         try:
             # Read content from file
-            r = os.read(self._fd, queue_size)
+            inotify = self._watch_manager._inotify_wrapper
+            if inotify.try_libc_name != 'inotify' or not inotify.has_direct_mode:
+                r = os.read(self._fd, queue_size)
+                rsum = 0  # counter
+                while rsum < queue_size:
+                    s_size = 16
+                    wd, mask, cookie, fname_len = struct.unpack('iIII',
+                                                                r[rsum:rsum+s_size])
+                    # Retrieve name
+                    bname, = struct.unpack('%ds' % fname_len,
+                                           r[rsum + s_size:rsum + s_size + fname_len])
+                    # FIXME: should we explicitly call sys.getdefaultencoding() here ??
+                    uname = bname.decode()
+                    rawevent = _RawEvent(wd, mask, cookie, uname)
+                    if self._coalesce:
+                        # Only enqueue new (unique) events.
+                        raweventstr = str(rawevent)
+                        if raweventstr not in self._eventset:
+                            self._eventset.add(raweventstr)
+                            self._eventq.append(rawevent)
+                    else:
+                        self._eventq.append(rawevent)
+                    rsum += s_size + fname_len
+            else:
+                events = ctypes.pointer(ctypes.pointer(iovec()))
+                num_events = inotify._libc.libinotify_direct_readv(self._fd, events, queue_size, 0)
+                log.debug(f"Number of events: {num_events}")
+                for i in range(0, num_events):
+                    j = 0
+                    while True:
+                        cur_event = events[i][j]
+                        if cur_event.iovbase is None:
+                            return
+                        # TODO: Convert pevent from ctypes.c_void_p to inotify_event
+                        # Right now checking pevent.mask, which is probably wrong
+                        pevent = cur_event.iov_base
+                        if pevent.mask == 0:
+                            break
+                        rawevent = _RawEvent(pevent.wd, pevent.mask, pevent.cookie, pevent.name)
+                        if self._coalesce:
+                            # Only enqueue new (unique) events.
+                            raweventstr = str(rawevent)
+                            if raweventstr not in self._eventset:
+                                self._eventset.add(raweventstr)
+                                self._eventq.append(rawevent)
+                        else:
+                            self._eventq.append(rawevent)
+                    inotify._libc.libinotify_free_iovec(events[i])
         except Exception as msg:
             raise NotifierError(msg)
-        log.debug('Event queue size: %d', queue_size)
-        rsum = 0  # counter
-        while rsum < queue_size:
-            s_size = 16
-            # Retrieve wd, mask, cookie and fname_len
-            wd, mask, cookie, fname_len = struct.unpack('iIII',
-                                                        r[rsum:rsum+s_size])
-            # Retrieve name
-            bname, = struct.unpack('%ds' % fname_len,
-                                   r[rsum + s_size:rsum + s_size + fname_len])
-            # FIXME: should we explicitly call sys.getdefaultencoding() here ??
-            uname = bname.decode()
-            rawevent = _RawEvent(wd, mask, cookie, uname)
-            if self._coalesce:
-                # Only enqueue new (unique) events.
-                raweventstr = str(rawevent)
-                if raweventstr not in self._eventset:
-                    self._eventset.add(raweventstr)
-                    self._eventq.append(rawevent)
-            else:
-                self._eventq.append(rawevent)
-            rsum += s_size + fname_len
 
     def process_events(self):
         """
@@ -1367,7 +1428,11 @@ class Notifier:
         """
         if self._fd is not None:
             self._pollobj.unregister(self._fd)
-            os.close(self._fd)
+            inotify = self._watch_manager._inotify_wrapper
+            if inotify.try_libc_name != 'inotify':
+                os.close(self._fd)
+            else:
+                inotify._libc.libinotify_direct_close(self._fd)
             self._fd = None
         self._sys_proc_fun = None
 
@@ -1831,7 +1896,7 @@ class WatchManager:
                          bitmask with |mask| when the watch is added.
         @type auto_add: bool
         @param do_glob: Do globbing on pathname (see standard globbing
-                        module for more informations).
+                        module for more information).
         @type do_glob: bool
         @param quiet: if False raises a WatchManagerError exception on
                       error. See example not_quiet.py.
