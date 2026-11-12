@@ -61,7 +61,6 @@ import subprocess
 from functools import reduce
 
 import ctypes
-import ctypes.util
 
 
 field_name = None
@@ -141,46 +140,47 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
 
     def init(self):
         # Get the proper inotify library
-        self.try_libc_name = 'c'
-        if sys.platform.startswith('linux'):
-            # Native support. Skip having to do the regexp below.
-            pass
-        elif sys.platform.startswith('freebsd') and float(re.match(r'^\d+\.\d+', os.uname().release).group()) >= 14.4:
-            # FreeBSD 14.4+ have native inotify support so don't use the
-            # libinotify shim in those versions.
-            pass
-        elif re.match('^.+bsd.*$', sys.platform) or sys.platform.startswith('darwin'):
-            self.try_libc_name = 'inotify'
+        import sysconfig
 
-        libc_name = None
-        try:
-            libc_name = ctypes.util.find_library(self.try_libc_name)
-        except (OSError, IOError):
-            # If no binding is found, InotifyBindingNotFoundError()
-            # will be raised in WatchManager() after the additional checks below.
-            pass
+        libc_inotify_found = False
+        libc_names = [(None, 'c'), ('libinotify' + sysconfig.get_config_var('SHLIB_SUFFIX'), 'inotify')]
 
         # Special handling for OpenBSD where the library is
         # installed in a subdirectory.
         if sys.platform.startswith('openbsd'):
-            libc_name = '/usr/local/lib/inotify/libinotify.so'
+            libc_names += [('/usr/local/lib/inotify/libinotify.so', 'inotify')]
 
-        self._libc = ctypes.CDLL(libc_name, use_errno=True)
-        self._get_errno_func = ctypes.get_errno
+        for libc_name_tuple in libc_names:
+            libc_name, self.try_libc_name = libc_name_tuple
 
-        # Eventually check that libc has needed inotify bindings.
-        if (not hasattr(self._libc, 'inotify_init1') or
-            not hasattr(self._libc, 'inotify_add_watch') or
-            not hasattr(self._libc, 'inotify_rm_watch')):
+            try:
+                self._libc = ctypes.CDLL(libc_name, use_errno=True)
+            except (OSError, IOError):
+                continue
+            self._get_errno_func = ctypes.get_errno
+
+            # Eventually check that libc has needed inotify bindings.
+            if (not hasattr(self._libc, 'inotify_init1') or
+                not hasattr(self._libc, 'inotify_add_watch') or
+                not hasattr(self._libc, 'inotify_rm_watch')):
+                import _ctypes
+                _ctypes.dlclose(self._libc._handle)
+                continue
+
+            libc_inotify_found = True
+
+            self._libc.inotify_init1.argtypes = [ctypes.c_int]
+            self._libc.inotify_init1.restype = ctypes.c_int
+            self._libc.inotify_add_watch.argtypes = [ctypes.c_int, ctypes.c_char_p,
+                                                     ctypes.c_uint32]
+            self._libc.inotify_add_watch.restype = ctypes.c_int
+            self._libc.inotify_rm_watch.argtypes = [ctypes.c_int, ctypes.c_int]
+            self._libc.inotify_rm_watch.restype = ctypes.c_int
+
+            break
+
+        if not libc_inotify_found:
             return False
-
-        self._libc.inotify_init1.argtypes = [ctypes.c_int]
-        self._libc.inotify_init1.restype = ctypes.c_int
-        self._libc.inotify_add_watch.argtypes = [ctypes.c_int, ctypes.c_char_p,
-                                                 ctypes.c_uint32]
-        self._libc.inotify_add_watch.restype = ctypes.c_int
-        self._libc.inotify_rm_watch.argtypes = [ctypes.c_int, ctypes.c_int]
-        self._libc.inotify_rm_watch.restype = ctypes.c_int
 
         self.has_direct_mode = False
         if self.try_libc_name == 'inotify':
