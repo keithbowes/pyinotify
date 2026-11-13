@@ -5,6 +5,7 @@ on: [push, pull_request]
 
 env:
   EXTRA_CFLAGS: "-pipe"
+  DYLD_LIBRARY_PATH: "/usr/local/lib:$DYLD_LIBRARY_PATH"
 
 jobs:
   test-macos:

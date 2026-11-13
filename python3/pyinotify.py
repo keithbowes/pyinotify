@@ -71,8 +71,9 @@ IN_DIRECT = 0x80000000 # libinotify open
 IN_NONBLOCK = 0o0004000
 
 # Things for libinotify directmode
+MAX_FILENAME_LENGTH = 255
 class inotify_event(ctypes.Structure):
-    _fields_ = [('wd', ctypes.c_int), ('mask', ctypes.c_uint32), ('cookie', ctypes.c_uint32), ('len', ctypes.c_uint32), ('name', ctypes.c_char_p)]
+    _fields_ = [('wd', ctypes.c_int), ('mask', ctypes.c_uint32), ('cookie', ctypes.c_uint32), ('len', ctypes.c_uint32), ('name', ctypes.c_char * MAX_FILENAME_LENGTH)]
     wd = 0
     mask = 0
     cookie = 0
@@ -80,8 +81,8 @@ class inotify_event(ctypes.Structure):
     name = ''
 
 class iovec(ctypes.Structure):
-    _fields_ = [('iov_base', inotify_event), ('iov_len', ctypes.c_size_t)]
-    iov_base = None
+    _fields_ = [('iov_base', ctypes.POINTER(inotify_event)), ('iov_len', ctypes.c_size_t)]
+    iov_base = ctypes.c_void_p(0)
     iov_len = 0
 
 
@@ -140,10 +141,11 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
 
     def init(self):
         # Get the proper inotify library
-        import sysconfig
-
         libc_inotify_found = False
-        libc_names = [(None, 'c'), ('libinotify' + sysconfig.get_config_var('SHLIB_SUFFIX'), 'inotify')]
+
+        get_libs = lambda name: [(f'lib{name}.so', name), (f'lib{name}.dylib', name)]
+        libc_names = [(None, 'c')]
+        libc_names += get_libs('inotify')
 
         # Special handling for OpenBSD where the library is
         # installed in a subdirectory.
@@ -1251,21 +1253,19 @@ class Notifier:
                 log.debug('Event queue size: %d', queue_size)
             else:
                 MAX_EVENTS = 255
-                events = ctypes.pointer(ctypes.pointer(iovec()))
-                num_events = inotify._libc.libinotify_direct_readv(self._fd, events, MAX_EVENTS, 0)
-                log.debug(f"Number of events: {num_events}")
+                events = ctypes.pointer(iovec())
+                num_events = inotify._libc.libinotify_direct_readv(self._fd, ctypes.byref(events), MAX_EVENTS, 0)
                 for i in range(0, num_events):
+                    cur_event = events[i]
                     j = 0
                     while True:
-                        cur_event = events[i][j]
-                        if cur_event.iovbase is None:
-                            return
-                        # TODO: Convert pevent from ctypes.c_void_p to inotify_event
-                        # Right now checking pevent.mask, which is probably wrong
-                        pevent = cur_event.iov_base
+                        pevent = cur_event.iov_base[j]
+                        if not bool(pevent):
+                            break
+                        # The above check seems not to work in Python like the equivalent does in C, so check for an unset mask:
                         if pevent.mask == 0:
                             break
-                        rawevent = _RawEvent(pevent.wd, pevent.mask, pevent.cookie, pevent.name)
+                        rawevent = _RawEvent(pevent.wd, pevent.mask, pevent.cookie, pevent.name.decode())
                         if self._coalesce:
                             # Only enqueue new (unique) events.
                             raweventstr = str(rawevent)
@@ -1274,7 +1274,10 @@ class Notifier:
                                 self._eventq.append(rawevent)
                         else:
                             self._eventq.append(rawevent)
+                        j += 1
                     inotify._libc.libinotify_free_iovec(events[i])
+
+                log.debug(f"Number of events: {num_events}")
         except Exception as msg:
             raise NotifierError(msg)
 
