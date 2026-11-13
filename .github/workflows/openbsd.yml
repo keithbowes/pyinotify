@@ -5,7 +5,7 @@ on: [push, pull_request]
 
 jobs:
   test-openbsd:
-    name: Build
+    name: Test on OpenBSD
     runs-on: ubuntu-latest
     permissions:
       contents: read

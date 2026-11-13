@@ -43,7 +43,6 @@ import sys
 import threading
 import os
 import select
-import struct
 import fcntl
 import errno
 import termios
@@ -1232,14 +1231,8 @@ class Notifier:
                 rsum = 0  # counter
                 while rsum < queue_size:
                     s_size = 16
-                    wd, mask, cookie, fname_len = struct.unpack('iIII',
-                                                                r[rsum:rsum+s_size])
-                    # Retrieve name
-                    bname, = struct.unpack('%ds' % fname_len,
-                                           r[rsum + s_size:rsum + s_size + fname_len])
-                    # FIXME: should we explicitly call sys.getdefaultencoding() here ??
-                    uname = bname.decode()
-                    rawevent = _RawEvent(wd, mask, cookie, uname)
+                    event = ctypes.cast(r, ctypes.POINTER(inotify_event)).contents
+                    rawevent = _RawEvent(event.wd, event.mask, event.cookie, event.name.decode())
                     if self._coalesce:
                         # Only enqueue new (unique) events.
                         raweventstr = str(rawevent)
@@ -1248,7 +1241,7 @@ class Notifier:
                             self._eventq.append(rawevent)
                     else:
                         self._eventq.append(rawevent)
-                    rsum += s_size + fname_len
+                    rsum += s_size + event.len
 
                 log.debug('Event queue size: %d', queue_size)
             else:

@@ -9,7 +9,7 @@ env:
 
 jobs:
   test-macos:
-    name: Build on macOS
+    name: Test on MacOS
     runs-on: macos-latest
     timeout-minutes: 300
     permissions:
