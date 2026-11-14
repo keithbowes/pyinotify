@@ -42,7 +42,7 @@ class PyinotifyError(Exception):
 import sys
 import threading
 import os
-import select
+import selectors
 import errno
 import termios
 import logging
@@ -1090,7 +1090,7 @@ class Notifier:
                           if read_freq is > 0, this thread sleeps
                           max(0, read_freq - (timeout / 1000)) seconds. But if
                           timeout is None it may be different because
-                          poll is blocking waiting for something to read.
+                          selector is blocking waiting for something to read.
         @type read_freq: int
         @param threshold: File descriptor will be read only if the accumulated
                           size to read becomes >= threshold. If != 0, you likely
@@ -1109,9 +1109,9 @@ class Notifier:
         self._watch_manager = watch_manager
         # File descriptor
         self._fd = self._watch_manager.get_fd()
-        # Poll object and registration
-        self._pollobj = select.poll()
-        self._pollobj.register(self._fd, select.POLLIN)
+        # Selector object and registration
+        self._selector = selectors.DefaultSelector()
+        self._selector.register(self._fd, selectors.EVENT_READ)
         # This pipe is correctly initialized and used by ThreadedNotifier
         self._pipe = (-1, -1)
         # Event queue
@@ -1130,8 +1130,6 @@ class Notifier:
         self._coalesce = False
         # set of str(raw_event), only used when coalesce option is True
         self._eventset = set()
-        
-        atexit.register(lambda : self._pollobj.unregister(self._fd))
 
     def append_event(self, event):
         """
@@ -1177,24 +1175,15 @@ class Notifier:
         @return: New events to read.
         @rtype: bool
         """
-        while True:
-            try:
-                # blocks up to 'timeout' milliseconds
-                if timeout is None:
-                    timeout = self._timeout
-                ret = self._pollobj.poll(timeout)
-            except select.error as err:
-                if err.args[0] == errno.EINTR:
-                    continue # interrupted, retry
-                else:
-                    raise
-            else:
-                break
+        # blocks up to 'timeout' milliseconds
+        if timeout is None:
+            timeout = self._timeout
+        ret = self._selector.select(timeout / 1000.0 if timeout is not None else None)
 
-        if not ret or (self._pipe[0] == ret[0][0]):
+        if not ret or (self._pipe[0] == ret[0][0].fileobj):
             return False
         # only one fd is polled
-        return ret[0][1] & select.POLLIN
+        return ret[0][1] & selectors.EVENT_READ
 
     def read_events(self):
         """
@@ -1396,11 +1385,12 @@ class Notifier:
                 break
         # Close internals
         self.stop()
-        self._sys_proc_fun = None
 
     def stop(self):
-        # Inheritable method that does nothing
-        pass
+        # Clean up from the loop
+        if self._fd is not None:
+            self._selector.unregister(self._fd)
+        self._sys_proc_fun = None
 
 
 class ThreadedNotifier(threading.Thread, Notifier):
@@ -1435,8 +1425,7 @@ class ThreadedNotifier(threading.Thread, Notifier):
                           least with read_freq you might sleep.
         @type threshold: int
         @param timeout: see read_freq above. If provided, it must be set in
-                        milliseconds. See
-                        https://docs.python.org/3/library/select.html#select.poll.poll
+                        milliseconds.
         @type timeout: int
         """
         # Init threading base class
@@ -1448,7 +1437,7 @@ class ThreadedNotifier(threading.Thread, Notifier):
                           threshold, timeout)
         # Create a new pipe used for thread termination
         self._pipe = os.pipe()
-        self._pollobj.register(self._pipe[0], select.POLLIN)
+        self._selector.register(self._pipe[0], selectors.EVENT_READ)
 
     def stop(self):
         """
@@ -1458,7 +1447,7 @@ class ThreadedNotifier(threading.Thread, Notifier):
         os.write(self._pipe[1], b'stop')
         threading.Thread.join(self)
         Notifier.stop(self)
-        self._pollobj.unregister(self._pipe[0])
+        self._selector.unregister(self._pipe[0])
         os.close(self._pipe[0])
         os.close(self._pipe[1])
 
@@ -1471,7 +1460,7 @@ class ThreadedNotifier(threading.Thread, Notifier):
         seconds at best and only if the size of events to read is >= threshold.
         """
         # When the loop must be terminated .stop() is called, 'stop'
-        # is written to pipe fd so poll() returns and .check_events()
+        # is written to pipe fd so selector returns and .check_events()
         # returns False which make evaluate the While's stop condition
         # ._stop_event.isSet() which put an end to the thread's execution.
         while not self._stop_event.isSet():
