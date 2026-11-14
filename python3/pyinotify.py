@@ -48,6 +48,7 @@ import termios
 import logging
 import atexit
 from collections import deque
+from collections.abc import ValuesView
 from datetime import datetime, timedelta
 import time
 import re
@@ -2035,7 +2036,7 @@ class WatchManager:
         @return: wrap param.
         @rtype: list of type(param)
         """
-        if isinstance(param, list):
+        if isinstance(param, ValuesView):
             for p_ in param:
                 yield p_
         else:
