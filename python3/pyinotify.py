@@ -54,6 +54,7 @@ import re
 import glob
 import locale
 import subprocess
+import weakref
 
 from functools import reduce
 
@@ -644,7 +645,7 @@ class _SysProcessEvent(_ProcessEvent):
         @type notifier: Notifier instance
         """
         self._watch_manager = wm  # watch manager
-        self._notifier = notifier  # notifier
+        self._notifier = weakref.ref(notifier)  # notifier
         self._mv_cookie = {}  # {cookie(int): (src_path(str), date), ...}
         self._mv = {}  # {src_path(str): (dst_path(str), date), ...}
 
@@ -702,7 +703,7 @@ class _SysProcessEvent(_ProcessEvent):
                                 # This path should not be taken.
                                 continue
                             rawevent = _RawEvent(created_dir_wd, flags, 0, name)
-                            self._notifier.append_event(rawevent)
+                            self._notifier().append_event(rawevent)
                     except OSError as err:
                         msg = "process_IN_CREATE, invalid directory: %s"
                         log.debug(msg % str(err))
@@ -1128,6 +1129,8 @@ class Notifier:
         self._coalesce = False
         # set of str(raw_event), only used when coalesce option is True
         self._eventset = set()
+        
+        atexit.register(lambda : self._pollobj.unregister(self._fd))
 
     def append_event(self, event):
         """
@@ -1392,23 +1395,11 @@ class Notifier:
                 break
         # Close internals
         self.stop()
+        self._sys_proc_fun = None
 
     def stop(self):
-        """
-        Close inotify's instance (close its file descriptor).
-        It destroys all existing watches, pending events,...
-        This method is automatically called at the end of loop().
-        Afterward it is invalid to access this instance.
-        """
-        if self._fd is not None:
-            self._pollobj.unregister(self._fd)
-            inotify = self._watch_manager._inotify_wrapper
-            if inotify.try_libc_name != 'inotify':
-                os.close(self._fd)
-            else:
-                inotify._libc.libinotify_direct_close(self._fd)
-            self._fd = None
-        self._sys_proc_fun = None
+        # Inheritable method that does nothing
+        pass
 
 
 class ThreadedNotifier(threading.Thread, Notifier):
@@ -1756,6 +1747,8 @@ class WatchManager:
         for attrname in ('max_queued_events', 'max_user_instances', 'max_user_watches'):
             setattr(self, attrname, ProcINotify(attrname, self._inotify_wrapper, self._fd))
 
+    def __del__(self):
+        self.close()
 
     def close(self):
         """
@@ -1767,7 +1760,11 @@ class WatchManager:
         several independent WatchManager must be instantiated or if all watches
         must be removed and no other watches need to be added.
         """
-        os.close(self._fd)
+        if self._inotify_wrapper.try_libc_name != 'inotify':
+            os.close(self._fd)
+        else:
+            self._inotify_wrapper._libc.libinotify_direct_close(self._fd)
+        self._fd = None
 
     def get_fd(self):
         """
