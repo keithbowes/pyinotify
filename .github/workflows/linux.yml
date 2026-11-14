@@ -9,12 +9,13 @@ jobs:
     steps:
       - name: packages
         run: |
-        apk add make python3
+          apk add make python3
       # actions/checkout@v7 clones the repository
       - uses: actions/checkout@v7
       - name: run-tests
         run: |
-        python3 -m venv $(pwd)/venv
-        . $(pwd)/venv/bin/activate
-        make deps
-        make test
+          python3 -m venv $(pwd)/venv
+          . $(pwd)/venv/bin/activate
+          make deps
+          make test
+          deactivate

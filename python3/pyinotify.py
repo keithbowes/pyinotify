@@ -146,11 +146,6 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
         libc_names = [(None, 'c')]
         libc_names += get_libs('inotify')
 
-        # Special handling for OpenBSD where the library is
-        # installed in a subdirectory.
-        if sys.platform.startswith('openbsd'):
-            libc_names += [('/usr/local/lib/inotify/libinotify.so', 'inotify')]
-
         for libc_name_tuple in libc_names:
             libc_name, self.try_libc_name = libc_name_tuple
 
@@ -183,30 +178,24 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
         if not libc_inotify_found:
             return False
 
-        self.has_direct_mode = False
         if self.try_libc_name == 'inotify':
-            if not hasattr(self._libc, 'libinotify_set_param'):
-                if hasattr(self._libc, 'inotify_set_param'):
-                    self._libc.libinotify.set_param = self._libc.inotify_set_param
-                else:
-                    return False
+            if (not hasattr(self._libc, 'libinotify_direct_close') or
+                not hasattr(self._libc, 'libinotify_direct_readv') or
+                not hasattr(self._libc, 'libinotify_free_iovec') or
+                not hasattr(self._libc, 'libinotify_set_param')):
+                return false
+
+            self._libc.libinotify_direct_close.argtypes = [ctypes.c_int]
+            self._libc.libinotify_direct_close.restype = ctypes.c_int
+
+            self._libc.libinotify_direct_readv.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.POINTER(iovec)), ctypes.c_int, ctypes.c_int]
+            self._libc.libinotify_direct_readv.restype = ctypes.c_int
+
+            self._libc.libinotify_free_iovec.argtypes = [ctypes.POINTER(iovec)]
+            self._libc.libinotify_free_iovec.restype = None
 
             self._libc.libinotify_set_param.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int]
             self._libc.libinotify_set_param.restype = ctypes.c_int
-
-            self.has_direct_mode = ((hasattr(self._libc, 'libinotify_direct_readv') and
-                                     hasattr(self._libc, 'libinotify_direct_close') and
-                                     hasattr(self._libc, 'libinotify_free_iovec')))
-
-            if self.has_direct_mode:
-                self._libc.libinotify_direct_close.argtypes = [ctypes.c_int]
-                self._libc.libinotify_direct_close.restype = ctypes.c_int
-
-                self._libc.libinotify_direct_readv.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.POINTER(iovec)), ctypes.c_int, ctypes.c_int]
-                self._libc.libinotify_direct_readv.restype = ctypes.c_int
-
-                self._libc.libinotify_free_iovec.argtypes = [ctypes.POINTER(iovec)]
-                self._libc.libinotify_free_iovec.restype = None
         return True
 
     def _get_errno(self):
@@ -1212,7 +1201,7 @@ class Notifier:
         try:
             # Read content from file
             inotify = self._watch_manager._inotify_wrapper
-            if inotify.try_libc_name != 'inotify' or not inotify.has_direct_mode:
+            if inotify.try_libc_name != 'inotify':
                 buf_ = array.array('i', [0])
                 # get event queue size
                 try:

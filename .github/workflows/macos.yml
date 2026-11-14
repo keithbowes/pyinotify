@@ -49,3 +49,4 @@ jobs:
           . $(pwd)/venv/bin/activate
           make deps
           make test
+          deactivate
