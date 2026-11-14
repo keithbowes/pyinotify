@@ -1848,7 +1848,7 @@ class WatchManager:
         @type proc_fun: function or ProcessEvent instance or instance of
                         one of its subclasses or callable object.
         @param rec: Recursively add watches from path on all its
-                    subdirectories, set to False by default (follows 
+                    subdirectories, set to False by default (follows
                     symlinks).
         @type rec: bool
         @param auto_add: Automatically add watches on newly created
@@ -1882,9 +1882,15 @@ class WatchManager:
         all_paths = set()
         # normalize args as list elements
         for npath in self.__format_param(path):
+            # attempt to cast to string so that pathlib objects are supported
+            try:
+                npath = str(npath)
+            except ValueError:
+                pass
             # Require that path be a Unicode string
             if not isinstance(npath, str):
                 ret_[path] = -3
+                log.error('add_watch: invalid path "%s"' % repr(path))
                 continue
 
             # unix pathname pattern expansion
@@ -2025,7 +2031,7 @@ class WatchManager:
         @return: wrap param.
         @rtype: list of type(param)
         """
-        if isinstance(param, ValuesView):
+        if isinstance(param, list) or isinstance(param, ValuesView):
             for p_ in param:
                 yield p_
         else:
