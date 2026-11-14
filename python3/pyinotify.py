@@ -146,6 +146,11 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
         libc_names = [(None, 'c')]
         libc_names += get_libs('inotify')
 
+        # Special handling for OpenBSD where the library is
+        # installed in a subdirectory.
+        if sys.platform.startswith('openbsd'):
+            libc_names += [('/usr/local/lib/inotify/libinotify.so', 'inotify')]
+
         for libc_name_tuple in libc_names:
             libc_name, self.try_libc_name = libc_name_tuple
 
@@ -1202,26 +1207,18 @@ class Notifier:
             # Read content from file
             inotify = self._watch_manager._inotify_wrapper
             if inotify.try_libc_name != 'inotify':
-                buf_ = array.array('i', [0])
-                # get event queue size
-                try:
-                    if fcntl.ioctl(self._fd, termios.FIONREAD, buf_, 1) == -1:
-                        return
-                except OSError:
-                    return
-                queue_size = buf_[0]
+                r = os.read(self._fd, 50)
+                queue_size = len(r)
                 if queue_size < self._threshold:
                     log.debug('(fd: %d) %d bytes available to read but threshold is '
                               'fixed to %d bytes', self._fd, queue_size,
                               self._threshold)
                     return
-
-                r = os.read(self._fd, queue_size)
+                idx = 0
                 rsum = 0  # counter
                 while rsum < queue_size:
-                    s_size = 16
-                    event = ctypes.cast(r, ctypes.POINTER(inotify_event)).contents
-                    rawevent = _RawEvent(event.wd, event.mask, event.cookie, event.name.decode())
+                    event = ctypes.cast(r, ctypes.POINTER(inotify_event))[idx]
+                    rawevent = _RawEvent(event.wd, event.mask, event.cookie, event.name.decode()[0:event.len])
                     if self._coalesce:
                         # Only enqueue new (unique) events.
                         raweventstr = str(rawevent)
@@ -1230,7 +1227,8 @@ class Notifier:
                             self._eventq.append(rawevent)
                     else:
                         self._eventq.append(rawevent)
-                    rsum += s_size + event.len
+                    rsum += ctypes.sizeof(inotify_event) + event.len
+                    idx += 1
 
                 log.debug('Event queue size: %d', queue_size)
             else:
@@ -1240,7 +1238,13 @@ class Notifier:
                 for i in range(0, num_events):
                     cur_event = events[i]
                     j = 0
-                    while (pevent := cur_event.iov_base[j]).mask != 0:
+                    while True:
+                        pevent = cur_event.iov_base[j]
+                        if not bool(pevent):
+                            break
+                        # The above check seems not to work in Python like the equivalent does in C, so check for an unset mask:
+                        if pevent.mask == 0:
+                            break
                         rawevent = _RawEvent(pevent.wd, pevent.mask, pevent.cookie, pevent.name.decode())
                         if self._coalesce:
                             # Only enqueue new (unique) events.

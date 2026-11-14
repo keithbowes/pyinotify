@@ -3,9 +3,6 @@ name: openbsd
 
 on: [push, pull_request]
 
-env:
-  LD_LIBRARY_PATH: "/usr/local/lib/inotify"
-
 jobs:
   test-openbsd:
     name: Test on OpenBSD
