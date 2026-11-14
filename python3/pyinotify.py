@@ -1245,6 +1245,8 @@ class Notifier:
                     inotify._libc.libinotify_free_iovec(events[i])
 
                 log.debug(f"Number of events: {num_events}")
+        except OSError:
+            pass
         except Exception as msg:
             raise NotifierError(msg)
 
@@ -1289,9 +1291,9 @@ class Notifier:
         @param stderr: files associated to common streams.
         """
         if pid_file is None:
-            dirname = '/var/run/'
+            dirname = os.getenv('XDG_RUNTIME_DIR') or '/var/run/'
             basename = os.path.basename(sys.argv[0]) or 'pyinotify'
-            pid_file = os.path.join(dirname, basename + '.pid')
+            pid_file = os.path.join(dirname, f'{basename}.{self._watch_manager._inotify_wrapper._libc.rand()}.pid')
 
         if pid_file != False and os.path.lexists(pid_file):
             err = 'Cannot daemonize: pid file %s already exists.' % pid_file
@@ -2272,6 +2274,9 @@ def command_line():
     parser.add_option("-c", "--command", action="store",
                       dest="command",
                       help="Shell command to run upon event")
+    parser.add_option("-d", "--daemonize", action="store_true",
+                      dest="daemonize",
+                      help="Run as a daemon")
 
     (options, args) = parser.parse_args()
 
@@ -2340,7 +2345,7 @@ def command_line():
 
     wm.add_watch(path, mask, rec=options.recursive, auto_add=options.auto_add, do_glob=options.glob)
     # Loop forever (until sigint signal get caught)
-    notifier.loop(callback=cb_fun)
+    notifier.loop(callback=cb_fun, daemonize=options.daemonize)
 
 
 if __name__ == '__main__':
