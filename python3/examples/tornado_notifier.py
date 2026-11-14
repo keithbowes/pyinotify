@@ -49,7 +49,7 @@ def handle_read_callback(notifier):
 
 wm = pyinotify.WatchManager()
 ioloop = IOLoop.instance()
-notifier = pyinotify.TornadoAsyncNotifier(wm, ioloop, 
+notifier = pyinotify.TornadoAsyncNotifier(wm, ioloop,
                                           callback=handle_read_callback,
                                           default_proc_fun=HandleEvents())
 wm.add_watch((os.getenv('TMPDIR') or '/tmp'), pyinotify.ALL_EVENTS)

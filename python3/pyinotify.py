@@ -30,7 +30,7 @@ pyinotify
 
 __author__ = "seb@dbzteam.org (Sebastien Martini)"
 
-__version__ = "0.10.0"
+__version__ = "0.11.0"
 
 
 class PyinotifyError(Exception):
@@ -90,7 +90,7 @@ class InotifyBindingNotFoundError(PyinotifyError):
     Raised when no inotify support couldn't be found.
     """
     def __init__(self):
-        err = "Couldn't find any inotify binding. If you use MacOS or a BSD be sure that libinotify is installed."
+        err = "Couldn't find any inotify binding. If you use MacOS or a BSD be sure that libinotify is installed and in your library path."
         PyinotifyError.__init__(self, err)
 
 
@@ -1251,13 +1251,7 @@ class Notifier:
                 for i in range(0, num_events):
                     cur_event = events[i]
                     j = 0
-                    while True:
-                        pevent = cur_event.iov_base[j]
-                        if not bool(pevent):
-                            break
-                        # The above check seems not to work in Python like the equivalent does in C, so check for an unset mask:
-                        if pevent.mask == 0:
-                            break
+                    while (pevent := cur_event.iov_base[j]).mask != 0:
                         rawevent = _RawEvent(pevent.wd, pevent.mask, pevent.cookie, pevent.name.decode())
                         if self._coalesce:
                             # Only enqueue new (unique) events.
