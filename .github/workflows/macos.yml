@@ -11,7 +11,6 @@ jobs:
   test-macos:
     name: Test on MacOS
     runs-on: macos-latest
-    timeout-minutes: 300
     permissions:
       contents: read
 

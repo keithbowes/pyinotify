@@ -70,8 +70,8 @@ IN_DIRECT = 0x80000000 # libinotify open
 IN_NONBLOCK = 0o0004000
 
 # Things for libinotify directmode
-BLOCK = 0
-NO_BLOCK = 1
+READV_POLL = 1
+READV_WAIT = 0
 
 MAX_FILENAME_LENGTH = 255
 class inotify_event(ctypes.Structure):
@@ -1224,7 +1224,7 @@ class Notifier:
             else:
                 MAX_EVENTS = 255
                 events = ctypes.pointer(iovec())
-                num_events = inotify._libc.libinotify_direct_readv(self._fd, ctypes.byref(events), MAX_EVENTS, NO_BLOCK)
+                num_events = inotify._libc.libinotify_direct_readv(self._fd, ctypes.byref(events), MAX_EVENTS, READV_POLL)
                 for i in range(0, num_events):
                     cur_event = events[i]
                     j = 0
@@ -1243,8 +1243,8 @@ class Notifier:
 
                 log.debug(f"Number of events: {num_events}")
                 return num_events
-        except OSError:
-            return 0
+        except (OSError, ValueError):
+            return num_events if 'num_events' in locals() else 0
         except Exception as msg:
             raise NotifierError(msg)
 

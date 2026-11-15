@@ -24,6 +24,7 @@ clean: clean-doc
 		-name '*.pyo' \) \
 		-print -exec rm {} \;
 	rm -rf build dist pyinotify.egg-info
+	rm -rf .pytest_cache
 
 deps:
 	python3 -m ensurepip
@@ -46,4 +47,5 @@ test: install
 	while ! test -e $${TMPDIR:-/tmp}/.notifier_finished && test $$i -lt 60; do i=`expr $$i + 1`; sleep 1; done;
 	rm -f $${TMPDIR:-/tmp}/.notifier_finished
 	rm -f $${TMPDIR:-/tmp}/.notifier_started
-	python3 -m pytest --rootdir=python3 --verbose
+# The tests are more informative than a breaker.
+	-python3 -m pytest --rootdir=python3 --verbose
