@@ -1,4 +1,3 @@
-import unittest
 import os
 import pyinotify
 import tempfile
@@ -12,16 +11,18 @@ class processor(pyinotify.ProcessEvent):
         event_holder.append(event)
 
 
-class TestPyinotifyEvents(unittest.TestCase):
+class TestPyinotifyEvents:
 
-    def setUp(self):
+    @classmethod
+    def setup_class(self):
         del event_holder[:]
         self.watch_directory = tempfile.mkdtemp()
         self.wm = pyinotify.WatchManager()
         self.wm.add_watch(self.watch_directory, pyinotify.ALL_EVENTS)
         self.notifier = pyinotify.Notifier(self.wm, processor())
 
-    def tearDown(self):
+    @classmethod
+    def teardown_class(self):
         shutil.rmtree(self.watch_directory)
 
     def _print_events(self):
@@ -34,7 +35,7 @@ class TestPyinotifyEvents(unittest.TestCase):
 
     def _check_events(self, expected):
         for i, mask in enumerate(expected):
-            self.assertEqual(mask, event_holder[i].mask)
+            assert mask == event_holder[i].mask
 
     def test_create_event(self):
         filename = os.path.join(self.watch_directory, "tmp")
@@ -60,14 +61,14 @@ class TestPyinotifyEvents(unittest.TestCase):
         # Move file out of directory
         shutil.move(filename, filename2)
         self._get_events()
-        self.assertEqual(pyinotify.IN_MOVED_FROM, event_holder[-1].mask)
+        assert pyinotify.IN_MOVED_FROM == event_holder[-1].mask
 
         del event_holder[:]
 
         # Move file into directory
         shutil.move(filename2, filename)
         self._get_events()
-        self.assertEqual(pyinotify.IN_MOVED_TO, event_holder[-1].mask)
+        assert pyinotify.IN_MOVED_TO == event_holder[-1].mask
 
         del event_holder[:]
 
@@ -77,8 +78,8 @@ class TestPyinotifyEvents(unittest.TestCase):
         self._get_events()
 
         self._check_events([pyinotify.IN_MOVED_FROM, pyinotify.IN_MOVED_TO])
-        self.assertEqual(filename, event_holder[0].pathname)
-        self.assertEqual(filename3, event_holder[1].pathname)
+        assert filename == event_holder[0].pathname
+        assert filename3 == event_holder[1].pathname
 
     def test_modify_events(self):
         filename = os.path.join(self.watch_directory, "tmp")
@@ -111,6 +112,3 @@ class TestPyinotifyEvents(unittest.TestCase):
 
         self._print_events()
         self._check_events([pyinotify.IN_DELETE])
-
-if __name__ == "__main__":
-    unittest.main()

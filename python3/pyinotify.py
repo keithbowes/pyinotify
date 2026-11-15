@@ -93,7 +93,7 @@ class InotifyBindingNotFoundError(PyinotifyError):
     Raised when no inotify support couldn't be found.
     """
     def __init__(self):
-        err = "Couldn't find any inotify binding. If you use MacOS or a BSD be sure that libinotify is installed and in your library path."
+        err = "Couldn't find any inotify binding. If you use MacOS or a BSD be sure that an up-to-date version of libinotify is installed and in your library path."
         PyinotifyError.__init__(self, err)
 
 

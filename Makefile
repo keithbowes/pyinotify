@@ -27,7 +27,7 @@ clean: clean-doc
 
 deps:
 	python3 -m ensurepip
-	python3 -m pip install build setuptools Sphinx
+	python3 -m pip install build pytest setuptools Sphinx
 
 # Make sure that it works when opened in the interpreter, when called in the
 # path, when called as a module, and that the API can detect file changes.
@@ -46,4 +46,4 @@ test: install
 	while ! test -e $${TMPDIR:-/tmp}/.notifier_finished && test $$i -lt 60; do i=`expr $$i + 1`; sleep 1; done;
 	rm -f $${TMPDIR:-/tmp}/.notifier_finished
 	rm -f $${TMPDIR:-/tmp}/.notifier_started
-	python3 python3/tests.py
+	python3 -m pytest --rootdir=python3 --verbose
