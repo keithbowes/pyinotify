@@ -70,6 +70,9 @@ IN_DIRECT = 0x80000000 # libinotify open
 IN_NONBLOCK = 0o0004000
 
 # Things for libinotify directmode
+BLOCK = 0
+NO_BLOCK = 1
+
 MAX_FILENAME_LENGTH = 255
 class inotify_event(ctypes.Structure):
     _fields_ = [('wd', ctypes.c_int), ('mask', ctypes.c_uint32), ('cookie', ctypes.c_uint32), ('len', ctypes.c_uint32), ('name', ctypes.c_char * MAX_FILENAME_LENGTH)]
@@ -1199,7 +1202,7 @@ class Notifier:
                     log.debug('(fd: %d) %d bytes available to read but threshold is '
                               'fixed to %d bytes', self._fd, queue_size,
                               self._threshold)
-                    return
+                    return queue_size
                 idx = 0
                 rsum = 0  # counter
                 while rsum < queue_size:
@@ -1217,10 +1220,11 @@ class Notifier:
                     idx += 1
 
                 log.debug('Event queue size: %d', queue_size)
+                return queue_size
             else:
                 MAX_EVENTS = 255
                 events = ctypes.pointer(iovec())
-                num_events = inotify._libc.libinotify_direct_readv(self._fd, ctypes.byref(events), MAX_EVENTS, 0)
+                num_events = inotify._libc.libinotify_direct_readv(self._fd, ctypes.byref(events), MAX_EVENTS, NO_BLOCK)
                 for i in range(0, num_events):
                     cur_event = events[i]
                     j = 0
@@ -1238,8 +1242,9 @@ class Notifier:
                     inotify._libc.libinotify_free_iovec(events[i])
 
                 log.debug(f"Number of events: {num_events}")
+                return num_events
         except OSError:
-            pass
+            return 0
         except Exception as msg:
             raise NotifierError(msg)
 

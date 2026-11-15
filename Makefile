@@ -46,3 +46,4 @@ test: install
 	while ! test -e $${TMPDIR:-/tmp}/.notifier_finished && test $$i -lt 60; do i=`expr $$i + 1`; sleep 1; done;
 	rm -f $${TMPDIR:-/tmp}/.notifier_finished
 	rm -f $${TMPDIR:-/tmp}/.notifier_started
+	python3 python3/tests.py
