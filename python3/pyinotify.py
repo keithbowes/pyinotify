@@ -107,36 +107,10 @@ class INotifyWrapper:
         """
         Factory method instantiating and returning the wrapper.
         """
-        inotify = _CtypesLibcINotifyWrapper()
+        inotify = INotifyWrapper()
         if inotify.init():
             return inotify
 
-    def get_errno(self):
-        """
-        Return None is no errno code is available.
-        """
-        return self._get_errno()
-
-    def str_errno(self):
-        code = self.get_errno()
-        if code is None:
-            return 'Errno: no errno support'
-        return 'Errno=%s (%s)' % (os.strerror(code), errno.errorcode[code])
-
-    def inotify_init(self):
-        return self._inotify_init()
-
-    def inotify_add_watch(self, fd, pathname, mask):
-        # Unicode strings must be encoded to string prior to calling this
-        # method.
-        assert isinstance(pathname, str)
-        return self._inotify_add_watch(fd, pathname, mask)
-
-    def inotify_rm_watch(self, fd, wd):
-        return self._inotify_rm_watch(fd, wd)
-
-
-class _CtypesLibcINotifyWrapper(INotifyWrapper):
     def __init__(self):
         self._libc = None
         self._get_errno_func = None
@@ -203,18 +177,30 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
             self._libc.libinotify_set_param.restype = ctypes.c_int
         return True
 
-    def _get_errno(self):
+    def get_errno(self):
+        """
+        Return None is no errno code is available.
+        """
         assert self._get_errno_func
         return self._get_errno_func()
 
-    def _inotify_init(self):
+    def str_errno(self):
+        code = self.get_errno()
+        if code is None:
+            return 'Errno: no errno support'
+        return 'Errno=%s (%s)' % (os.strerror(code), errno.errorcode[code])
+
+    def inotify_init(self):
         assert self._libc is not None
         flags = IN_CLOEXEC | IN_NONBLOCK
         if self.try_libc_name == 'inotify':
             flags |= IN_DIRECT
         return self._libc.inotify_init1(flags)
 
-    def _inotify_add_watch(self, fd, pathname, mask):
+    def inotify_add_watch(self, fd, pathname, mask):
+        # Unicode strings must be encoded to string prior to calling this
+        # method.
+        assert isinstance(pathname, str)
         assert self._libc is not None
         # Encodes path to a bytes string. This conversion seems required because
         # ctypes.create_string_buffer seems to manipulate bytes internally.
@@ -224,7 +210,7 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
         pathname = ctypes.create_string_buffer(pathname)
         return self._libc.inotify_add_watch(fd, pathname, mask)
 
-    def _inotify_rm_watch(self, fd, wd):
+    def inotify_rm_watch(self, fd, wd):
         assert self._libc is not None
         return self._libc.inotify_rm_watch(fd, wd)
 
@@ -1204,7 +1190,7 @@ class Notifier:
                     log.debug('(fd: %d) %d bytes available to read but threshold is '
                               'fixed to %d bytes', self._fd, queue_size,
                               self._threshold)
-                    return queue_size
+                    return 0
                 idx = 0
                 rsum = 0  # counter
                 while rsum < queue_size:
