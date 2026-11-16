@@ -42,6 +42,7 @@ test: install
 	while ! test -e $${TMPDIR:-/tmp}/.notifier_started && test $$i -lt 60; do i=`expr $$i + 1`; sleep 1; done;
 	touch $${TMPDIR:-/tmp}/foo
 	mv $${TMPDIR:-/tmp}/foo $${TMPDIR:-/tmp}/bar
+	echo "baz" > $${TMPDIR:-/tmp}/bar
 	rm -f $${TMPDIR:-/tmp}/bar
 	i=0; \
 	while ! test -e $${TMPDIR:-/tmp}/.notifier_finished && test $$i -lt 60; do i=`expr $$i + 1`; sleep 1; done;

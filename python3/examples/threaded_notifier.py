@@ -1,6 +1,8 @@
 import pyinotify
 import os
 
+iterations_left = 9 if os.getenv('TEST') else 4
+
 class HandleEvents(pyinotify.ProcessEvent):
     """
     A minimal example of how to handle events.
@@ -33,7 +35,12 @@ class HandleEvents(pyinotify.ProcessEvent):
         else:
             print(f"Unhandled event {event.maskname} on {event.pathname}")
             print("")
-        notifier._stop_event.set() # Exit when the first event(s) come in
+
+        global iterations_left
+        if iterations_left <= 0:
+            notifier._stop_event.set() # Exit when no iterations are left
+
+        iterations_left -= 1
 
 
 tmpdir = (os.getenv('TMPDIR') or '/tmp')
