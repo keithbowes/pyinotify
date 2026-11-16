@@ -1184,7 +1184,13 @@ class Notifier:
             # Read content from file
             inotify = self._watch_manager._inotify_wrapper
             if inotify.try_libc_name != 'inotify':
-                r = os.read(self._fd, 50)
+                r = None
+                read_size = 50
+                while r is None:
+                    try:
+                        r = os.read(self._fd, read_size)
+                    except OSError:
+                        read_size += 1
                 queue_size = len(r)
                 if queue_size < self._threshold:
                     log.debug('(fd: %d) %d bytes available to read but threshold is '
