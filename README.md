@@ -16,9 +16,7 @@
       surely have a compatible version).
     * FreeBSD  ≥ 14.4.
     * MacOS X or a BSD distribution (including versions of FreeBSD below 14.3) with
-      [libinotify](https://github.com/libinotify-kqueue/libinotify-kqueue). See
-      libinotify's GitHub page for an overview of its limitations compared to native support in
-      Linux and FreeBSD.
+      [libinotify](https://github.com/libinotify-kqueue/libinotify-kqueue).
 
 
 ## Install

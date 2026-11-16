@@ -30,7 +30,7 @@ pyinotify
 
 __author__ = "seb@dbzteam.org (Sebastien Martini)"
 
-__version__ = "0.11.0"
+__version__ = "0.11.1"
 
 
 class PyinotifyError(Exception):
@@ -163,7 +163,9 @@ class _CtypesLibcINotifyWrapper(INotifyWrapper):
                 not hasattr(self._libc, 'inotify_add_watch') or
                 not hasattr(self._libc, 'inotify_rm_watch')):
                 import _ctypes
-                _ctypes.dlclose(self._libc._handle)
+                if hasattr(_ctypes, 'dlclose'):
+                    # Not available in PyPy
+                    _ctypes.dlclose(self._libc._handle)
                 continue
 
             libc_inotify_found = True
@@ -1755,6 +1757,9 @@ class WatchManager:
         several independent WatchManager must be instantiated or if all watches
         must be removed and no other watches need to be added.
         """
+        if self._inotify_wrapper is None:
+            # Prevent an error when exiting after no inotify implementation found.
+            return
         if self._inotify_wrapper.try_libc_name != 'inotify':
             os.close(self._fd)
         else:
