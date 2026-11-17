@@ -125,7 +125,7 @@ class INotifyWrapper:
             return inotify
 
     def __init__(self):
-        self._libc = None
+        self._inotifyimpl = None
         self._get_errno_func = None
 
     def init(self):
@@ -135,64 +135,64 @@ class INotifyWrapper:
         :return: Whether an inotify library could be found.
         :rtype: bool
         """
-        libc_inotify_found = False
+        inotifyimpl_found = False
 
         get_libs = lambda name: [(f'lib{name}.so', name), (f'lib{name}.dylib', name)]
-        libc_names = [(None, 'c')]
-        libc_names += get_libs('inotify')
+        inotify_libs = [(None, 'c')]
+        inotify_libs += get_libs('inotify')
 
-        for libc_name_tuple in libc_names:
-            libc_name, self.try_libc_name = libc_name_tuple
+        for found_libs_tuple in inotify_libs:
+            inotify_lib, self.inotify_lib_name = found_libs_tuple
 
             try:
-                self._libc = ctypes.CDLL(libc_name, use_errno=True)
+                self._inotifyimpl = ctypes.CDLL(inotify_lib, use_errno=True)
             except (OSError, IOError):
                 continue
             self._get_errno_func = ctypes.get_errno
 
-            # Eventually check that libc has needed inotify bindings.
-            if (not hasattr(self._libc, 'inotify_init1') or
-                not hasattr(self._libc, 'inotify_add_watch') or
-                not hasattr(self._libc, 'inotify_rm_watch')):
+            # Check that the inotify library has needed inotify bindings.
+            if (not hasattr(self._inotifyimpl, 'inotify_init1') or
+                not hasattr(self._inotifyimpl, 'inotify_add_watch') or
+                not hasattr(self._inotifyimpl, 'inotify_rm_watch')):
                 import _ctypes
                 if hasattr(_ctypes, 'dlclose'):
                     # Not available in PyPy
-                    _ctypes.dlclose(self._libc._handle)
+                    _ctypes.dlclose(self._inotifyimpl._handle)
                 continue
 
-            libc_inotify_found = True
+            inotifyimpl_found = True
 
-            self._libc.inotify_init1.argtypes = [ctypes.c_int]
-            self._libc.inotify_init1.restype = ctypes.c_int
-            self._libc.inotify_add_watch.argtypes = [ctypes.c_int, ctypes.c_char_p,
+            self._inotifyimpl.inotify_init1.argtypes = [ctypes.c_int]
+            self._inotifyimpl.inotify_init1.restype = ctypes.c_int
+            self._inotifyimpl.inotify_add_watch.argtypes = [ctypes.c_int, ctypes.c_char_p,
                                                      ctypes.c_uint32]
-            self._libc.inotify_add_watch.restype = ctypes.c_int
-            self._libc.inotify_rm_watch.argtypes = [ctypes.c_int, ctypes.c_int]
-            self._libc.inotify_rm_watch.restype = ctypes.c_int
+            self._inotifyimpl.inotify_add_watch.restype = ctypes.c_int
+            self._inotifyimpl.inotify_rm_watch.argtypes = [ctypes.c_int, ctypes.c_int]
+            self._inotifyimpl.inotify_rm_watch.restype = ctypes.c_int
 
             break
 
-        if not libc_inotify_found:
+        if not inotifyimpl_found:
             return False
 
-        if self.try_libc_name == 'inotify':
-            if (not hasattr(self._libc, 'libinotify_direct_close') or
-                not hasattr(self._libc, 'libinotify_direct_readv') or
-                not hasattr(self._libc, 'libinotify_free_iovec') or
-                not hasattr(self._libc, 'libinotify_set_param')):
+        if self.inotify_lib_name == 'inotify':
+            if (not hasattr(self._inotifyimpl, 'libinotify_direct_close') or
+                not hasattr(self._inotifyimpl, 'libinotify_direct_readv') or
+                not hasattr(self._inotifyimpl, 'libinotify_free_iovec') or
+                not hasattr(self._inotifyimpl, 'libinotify_set_param')):
                 return False
 
-            self._libc.libinotify_direct_close.argtypes = [ctypes.c_int]
-            self._libc.libinotify_direct_close.restype = ctypes.c_int
+            self._inotifyimpl.libinotify_direct_close.argtypes = [ctypes.c_int]
+            self._inotifyimpl.libinotify_direct_close.restype = ctypes.c_int
 
-            self._libc.libinotify_direct_readv.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.POINTER(iovec)), ctypes.c_int, ctypes.c_int]
-            self._libc.libinotify_direct_readv.restype = ctypes.c_int
+            self._inotifyimpl.libinotify_direct_readv.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.POINTER(iovec)), ctypes.c_int, ctypes.c_int]
+            self._inotifyimpl.libinotify_direct_readv.restype = ctypes.c_int
 
-            self._libc.libinotify_free_iovec.argtypes = [ctypes.POINTER(iovec)]
-            self._libc.libinotify_free_iovec.restype = None
+            self._inotifyimpl.libinotify_free_iovec.argtypes = [ctypes.POINTER(iovec)]
+            self._inotifyimpl.libinotify_free_iovec.restype = None
 
-            self._libc.libinotify_set_param.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int]
-            self._libc.libinotify_set_param.restype = ctypes.c_int
+            self._inotifyimpl.libinotify_set_param.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int]
+            self._inotifyimpl.libinotify_set_param.restype = ctypes.c_int
         return True
 
     def get_errno(self):
@@ -212,28 +212,28 @@ class INotifyWrapper:
         return 'Errno=%s (%s)' % (os.strerror(code), errno.errorcode[code])
 
     def inotify_init(self):
-        assert self._libc is not None
+        assert self._inotifyimpl is not None
         flags = IN_CLOEXEC | IN_NONBLOCK
-        if self.try_libc_name == 'inotify':
+        if self.inotify_lib_name == 'inotify':
             flags |= IN_DIRECT
-        return self._libc.inotify_init1(flags)
+        return self._inotifyimpl.inotify_init1(flags)
 
     def inotify_add_watch(self, fd, pathname, mask):
         # Unicode strings must be encoded to string prior to calling this
         # method.
         assert isinstance(pathname, str)
-        assert self._libc is not None
+        assert self._inotifyimpl is not None
         # Encodes path to a bytes string. This conversion seems required because
         # ctypes.create_string_buffer seems to manipulate bytes internally.
         # Moreover it seems that inotify_add_watch does not work very well when
         # it receives an ctypes.create_unicode_buffer instance as argument.
         pathname = pathname.encode(sys.getfilesystemencoding())
         pathname = ctypes.create_string_buffer(pathname)
-        return self._libc.inotify_add_watch(fd, pathname, mask)
+        return self._inotifyimpl.inotify_add_watch(fd, pathname, mask)
 
     def inotify_rm_watch(self, fd, wd):
-        assert self._libc is not None
-        return self._libc.inotify_rm_watch(fd, wd)
+        assert self._inotifyimpl is not None
+        return self._inotifyimpl.inotify_rm_watch(fd, wd)
 
 
 # Logging
@@ -263,7 +263,7 @@ class ProcINotify:
     def __init__(self, attr, inotify, fd):
         self.inotify = inotify
         self._fd = fd
-        if self.inotify.try_libc_name == 'inotify':
+        if self.inotify.inotify_lib_name == 'inotify':
             # Default values from libinotify
             self.max_queued_events = 16384
             self.max_user_instances = 2147483646
@@ -280,7 +280,7 @@ class ProcINotify:
         @rtype: int
         @raise IOError: if corresponding file in /proc/sys cannot be read.
         """
-        if self.inotify.try_libc_name == 'inotify':
+        if self.inotify.inotify_lib_name == 'inotify':
             return int(getattr(self, self._attr))
         else:
             with open(os.path.join(self._base, self._attr), 'r') as file_obj:
@@ -294,7 +294,7 @@ class ProcINotify:
         @type nval: int
         @raise IOError: if corresponding file in /proc/sys cannot be written.
         """
-        if self.inotify.try_libc_name == 'inotify':
+        if self.inotify.inotify_lib_name == 'inotify':
             setattr(self, self._attr, nval)
             if self._attr == 'max_user_watches':
                 # No equivalent for libinotify; users can change the value but it won't do anything.
@@ -302,7 +302,7 @@ class ProcINotify:
             IN_MAX_QUEUED_EVENTS = 1
             IN_MAX_USER_INSTANCES = 2
             _map = {'max_queued_events': IN_MAX_QUEUED_EVENTS, 'max_user_instances': IN_MAX_USER_INSTANCES}
-            self.inotify._libc.libinotify_set_param(self._fd, _map[self._attr], nval)
+            self.inotify._inotifyimpl.libinotify_set_param(self._fd, _map[self._attr], nval)
         else:
             with open(os.path.join(self._base, self._attr), 'w') as file_obj:
                 file_obj.write(str(nval) + '\n')
@@ -1225,7 +1225,7 @@ class Notifier:
         try:
             # Read content from file
             inotify = self._watch_manager._inotify_wrapper
-            if inotify.try_libc_name != 'inotify':
+            if inotify.inotify_lib_name != 'inotify':
                 max_buffer_size = 500
                 r = None
                 read_size = 50
@@ -1256,14 +1256,14 @@ class Notifier:
             else:
                 MAX_EVENTS = 255
                 events = ctypes.pointer(iovec())
-                num_events = inotify._libc.libinotify_direct_readv(self._fd, ctypes.byref(events), MAX_EVENTS, READV_NONBLOCK)
+                num_events = inotify._inotifyimpl.libinotify_direct_readv(self._fd, ctypes.byref(events), MAX_EVENTS, READV_NONBLOCK)
                 for i in range(0, num_events):
                     cur_event = events[i]
                     j = 0
                     while (pevent := cur_event.iov_base[j]).mask != 0:
                         self.add_event(pevent)
                         j += 1
-                    inotify._libc.libinotify_free_iovec(events[i])
+                    inotify._inotifyimpl.libinotify_free_iovec(events[i])
 
                 log.debug(f"Number of events: {num_events}")
                 return num_events
@@ -1315,7 +1315,7 @@ class Notifier:
         if pid_file is None:
             dirname = os.getenv('XDG_RUNTIME_DIR') or '/var/run/'
             basename = os.path.basename(sys.argv[0]) or 'pyinotify'
-            pid_file = os.path.join(dirname, f'{basename}.{self._watch_manager._inotify_wrapper._libc.rand()}.pid')
+            pid_file = os.path.join(dirname, f'{basename}.{self._watch_manager._inotify_wrapper._inotifyimpl.rand()}.pid')
 
         if pid_file != False and os.path.lexists(pid_file):
             err = 'Cannot daemonize: pid file %s already exists.' % pid_file
@@ -1782,10 +1782,10 @@ class WatchManager:
         if self._inotify_wrapper is None:
             # Prevent an error when exiting after no inotify implementation found.
             return
-        if self._inotify_wrapper.try_libc_name != 'inotify':
+        if self._inotify_wrapper.inotify_lib_name != 'inotify':
             os.close(self._fd)
         else:
-            self._inotify_wrapper._libc.libinotify_direct_close(self._fd)
+            self._inotify_wrapper._inotifyimpl.libinotify_direct_close(self._fd)
         self._fd = None
 
     def get_fd(self):
