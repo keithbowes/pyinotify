@@ -65,32 +65,45 @@ import ctypes
 field_name = None
 
 # Flags for inotify_init1()
-IN_CLOEXEC = 0o2000000
-IN_DIRECT = 0x80000000 # libinotify open
-IN_NONBLOCK = 0o0004000
+IN_CLOEXEC = 0o2000000 # Set the close-on-exec flag on the new file descriptor.
+IN_DIRECT = 0x80000000 # Direct mode operation (libinotify-specific)
+IN_NONBLOCK = 0o0004000 # Sets the nonblock status flag on the new file descriptor.
 
 # Things for libinotify directmode
-READV_POLL = 1
-READV_WAIT = 0
+READV_BLOCK = 0 # Block until events are received.
+READV_NONBLOCK = 1 # Don't block but just poll for new events.
 
 MAX_FILENAME_LENGTH = 255
 class inotify_event(ctypes.Structure):
+    """
+    Structure describing an inotify event.
+    """
     _fields_ = [('wd', ctypes.c_int), ('mask', ctypes.c_uint32), ('cookie', ctypes.c_uint32), ('len', ctypes.c_uint32), ('name', ctypes.c_char * MAX_FILENAME_LENGTH)]
+    #: Watch descriptor.
     wd = 0
+    #: Watch mask
     mask = 0
+    #: Cookie to synchronize two events.
     cookie = 0
+    #: Length (including NULs) of the :py:attr:`name`.
     len = 0
+    #: Name
     name = ''
 
 class iovec(ctypes.Structure):
+    """
+    Vector I/O data structure.
+    """
     _fields_ = [('iov_base', ctypes.POINTER(inotify_event)), ('iov_len', ctypes.c_size_t)]
+    #: Base address.
     iov_base = ctypes.c_void_p(0)
+    #: Size of the memory pointed to by :py:attr:`iov_base`.
     iov_len = 0
 
 
 class InotifyBindingNotFoundError(PyinotifyError):
     """
-    Raised when no inotify support couldn't be found.
+    Raised when no inotify support could be found.
     """
     def __init__(self):
         err = "Couldn't find any inotify binding. If you use MacOS or a BSD be sure that an up-to-date version of libinotify is installed and in your library path."
@@ -116,7 +129,12 @@ class INotifyWrapper:
         self._get_errno_func = None
 
     def init(self):
-        # Get the proper inotify library
+        """
+        Initialize the proper inotify library.
+
+        :return: Whether an inotify library could be found.
+        :rtype: bool
+        """
         libc_inotify_found = False
 
         get_libs = lambda name: [(f'lib{name}.so', name), (f'lib{name}.dylib', name)]
@@ -162,7 +180,7 @@ class INotifyWrapper:
                 not hasattr(self._libc, 'libinotify_direct_readv') or
                 not hasattr(self._libc, 'libinotify_free_iovec') or
                 not hasattr(self._libc, 'libinotify_set_param')):
-                return false
+                return False
 
             self._libc.libinotify_direct_close.argtypes = [ctypes.c_int]
             self._libc.libinotify_direct_close.restype = ctypes.c_int
@@ -179,7 +197,10 @@ class INotifyWrapper:
 
     def get_errno(self):
         """
-        Return None is no errno code is available.
+        Gets the error code when an error happens.
+
+        :return: The errno code or None of not available.
+        :rtype: int
         """
         assert self._get_errno_func
         return self._get_errno_func()
@@ -565,7 +586,7 @@ class Event(_Event):
 
 class ProcessEventError(PyinotifyError):
     """
-    ProcessEventError Exception. Raised on ProcessEvent error.
+    ProcessEventError Exception. Raised on :py:class:`ProcessEvent` error.
     """
     def __init__(self, err):
         """
@@ -591,7 +612,7 @@ class _ProcessEvent:
         @type event: Event object
         @return: By convention when used from the ProcessEvent class:
                  - Returning False or None (default value) means keep on
-                 executing next chained functors (see chain.py example).
+                 executing next chained functors.
                  - Returning True instead means do not execute next
                    processing functions.
         @rtype: bool
@@ -908,7 +929,8 @@ class ProcessEvent(_ProcessEvent):
     def process_default(self, event):
         """
         Default processing event method. By default does nothing. Subclass
-        ProcessEvent and redefine this method in order to modify its behavior.
+        :py:class:`ProcessEvent` and redefine this method in order to modify
+        its behavior.
 
         @param event: Event to be processed. Can be of any type of events but
                       IN_Q_OVERFLOW events (see method process_IN_Q_OVERFLOW).
@@ -977,7 +999,7 @@ class Stats(ProcessEvent):
 
     def process_default(self, event):
         """
-        Processes |event|.
+        Processes `event`.
         """
         self._stats_lock.acquire()
         try:
@@ -1122,6 +1144,23 @@ class Notifier:
         # set of str(raw_event), only used when coalesce option is True
         self._eventset = set()
 
+    def add_event(self, event):
+        """
+        Convert an inotify_event to a raw event and append it to the queue.
+
+        :param event: An event.
+        :type event: inotify_event
+        """
+        rawevent = _RawEvent(event.wd, event.mask, event.cookie, event.name[0:event.len].decode())
+        if self._coalesce:
+            # Only enqueue new (unique) events.
+            raweventstr = str(rawevent)
+            if raweventstr not in self._eventset:
+                self._eventset.add(raweventstr)
+                self._eventq.append(rawevent)
+        else:
+            self._eventq.append(rawevent)
+
     def append_event(self, event):
         """
         Append a raw event to the event queue.
@@ -1144,10 +1183,10 @@ class Notifier:
         when the combination of its fields (wd, mask, cookie, name) is unique
         among events of a same batch. After a batch of events is processed any
         events is accepted again. By default this option is disabled, you have
-        to explictly call this function to turn it on.
+        to explicitly call this function to turn it on.
 
         @param coalesce: Optional new coalescing value. True by default.
-        @type coalesce: Bool
+        :type coalesce: bool
         """
         self._coalesce = coalesce
         if not coalesce:
@@ -1179,18 +1218,25 @@ class Notifier:
     def read_events(self):
         """
         Read events from device, build _RawEvents, and enqueue them.
+
+        :return: The number of events
+        :rtype: int
         """
         try:
             # Read content from file
             inotify = self._watch_manager._inotify_wrapper
             if inotify.try_libc_name != 'inotify':
+                max_buffer_size = 500
                 r = None
                 read_size = 50
-                while r is None:
+                while r is None and read_size <= max_buffer_size:
                     try:
                         r = os.read(self._fd, read_size)
                     except OSError:
                         read_size += 1
+                if r is None:
+                    return 0
+
                 queue_size = len(r)
                 if queue_size < self._threshold:
                     log.debug('(fd: %d) %d bytes available to read but threshold is '
@@ -1201,15 +1247,7 @@ class Notifier:
                 rsum = 0  # counter
                 while rsum < queue_size:
                     event = ctypes.cast(r, ctypes.POINTER(inotify_event))[idx]
-                    rawevent = _RawEvent(event.wd, event.mask, event.cookie, event.name[0:event.len].decode())
-                    if self._coalesce:
-                        # Only enqueue new (unique) events.
-                        raweventstr = str(rawevent)
-                        if raweventstr not in self._eventset:
-                            self._eventset.add(raweventstr)
-                            self._eventq.append(rawevent)
-                    else:
-                        self._eventq.append(rawevent)
+                    self.add_event(event)
                     rsum += ctypes.sizeof(inotify_event) + event.len
                     idx += 1
 
@@ -1218,20 +1256,12 @@ class Notifier:
             else:
                 MAX_EVENTS = 255
                 events = ctypes.pointer(iovec())
-                num_events = inotify._libc.libinotify_direct_readv(self._fd, ctypes.byref(events), MAX_EVENTS, READV_POLL)
+                num_events = inotify._libc.libinotify_direct_readv(self._fd, ctypes.byref(events), MAX_EVENTS, READV_NONBLOCK)
                 for i in range(0, num_events):
                     cur_event = events[i]
                     j = 0
                     while (pevent := cur_event.iov_base[j]).mask != 0:
-                        rawevent = _RawEvent(pevent.wd, pevent.mask, pevent.cookie, pevent.name[0:pevent.len].decode())
-                        if self._coalesce:
-                            # Only enqueue new (unique) events.
-                            raweventstr = str(rawevent)
-                            if raweventstr not in self._eventset:
-                                self._eventset.add(raweventstr)
-                                self._eventq.append(rawevent)
-                        else:
-                            self._eventq.append(rawevent)
+                        self.add_event(pevent)
                         j += 1
                     inotify._libc.libinotify_free_iovec(events[i])
 
@@ -1492,7 +1522,7 @@ class TornadoAsyncNotifier(Notifier):
         Note that if later you must call ioloop.close() be sure to let the
         default parameter to all_fds=False.
 
-        See example tornado_notifier.py for an example using this notifier.
+        See examples/tornado_notifier.py for an example usage.
 
         @param ioloop: Tornado's IO loop.
         @type ioloop: tornado.ioloop.IOLoop instance.
@@ -1676,7 +1706,7 @@ class ExcludeFilter:
 
 class WatchManagerError(Exception):
     """
-    WatchManager Exception. Raised on error encountered on watches
+    :py:class:`WatchManager` Exception. Raised on error encountered on watches
     operations.
     """
     def __init__(self, msg, wmd):
@@ -1743,11 +1773,11 @@ class WatchManager:
         """
         Close inotify's file descriptor, this action will also automatically
         remove (i.e. stop watching) all its associated watch descriptors.
-        After a call to this method the WatchManager's instance become useless
-        and cannot be reused, a new instance must then be instanciated. It
-        makes sense to call this method in few situations for instance if
-        several independent WatchManager must be instantiated or if all watches
-        must be removed and no other watches need to be added.
+        After a call to this method the :py:class:`WatchManager`'s instance
+        become useless and cannot be reused, a new instance must then be
+        instantiated. It makes sense to call this method in few situations for
+        instance if several independent WatchManager must be instantiated or if
+        all watches must be removed and no other watches need to be added.
         """
         if self._inotify_wrapper is None:
             # Prevent an error when exiting after no inotify implementation found.
@@ -1833,11 +1863,11 @@ class WatchManager:
                   auto_add=False, do_glob=False, quiet=True,
                   exclude_filter=None):
         """
-        Add watch(s) on the provided |path|(s) with associated |mask| flag
-        value and optionally with a processing |proc_fun| function and
-        recursive flag |rec| set to True.
-        All |path| components _must_ be str (i.e. Unicode) objects.
-        If |path| is already watched it is ignored, but if it is called with
+        Add watches on the provided `path` with associated `mask` flag
+        value and optionally with a processing `proc_fun` function and
+        recursive flag `rec` set to True.
+        All `path` components **must** be str (i.e. Unicode) objects.
+        If *path* is already watched it is ignored, but if it is called with
         option rec=True a watch is put on each one of its not-watched
         subdirectory.
 
@@ -1847,22 +1877,22 @@ class WatchManager:
         @param mask: Bitmask of events.
         @type mask: int
         @param proc_fun: Processing object.
-        @type proc_fun: function or ProcessEvent instance or instance of
-                        one of its subclasses or callable object.
+        @type proc_fun: function or :py:class:`ProcessEvent` instance or
+                         instance of one of its subclasses or callable object.
         @param rec: Recursively add watches from path on all its
                     subdirectories, set to False by default (follows
                     symlinks).
         @type rec: bool
         @param auto_add: Automatically add watches on newly created
-                         directories in watched parent |path| directory.
-                         If |auto_add| is True, IN_CREATE is used in a
-                         bitmask with |mask| when the watch is added.
+                         directories in watched parent `path` directory.
+                         If `auto_add` is True, IN_CREATE is used in a
+                         bitmask with `mask` when the watch is added.
         @type auto_add: bool
         @param do_glob: Do globbing on pathname (see standard globbing
                         module for more information).
         @type do_glob: bool
-        @param quiet: if False raises a WatchManagerError exception on
-                      error. See example not_quiet.py.
+        @param quiet: if False raises a :py:class:`WatchManagerError`
+                      exception on error.
         @type quiet: bool
         @param exclude_filter: predicate (boolean function), which returns
                                True if the current path must be excluded
@@ -1958,9 +1988,9 @@ class WatchManager:
     def update_watch(self, wd, mask=None, proc_fun=None, rec=False,
                      auto_add=False, quiet=True):
         """
-        Update existing watch descriptors |wd|. The |mask| value, the
-        processing object |proc_fun|, the recursive param |rec| and the
-        |auto_add| and |quiet| flags can all be updated.
+        Update existing watch descriptors `wd`. The `mask` value, the
+        processing object `proc_fun`, the recursive param `rec` and the
+        `auto_add` and `quiet` flags can all be updated.
 
         @param wd: Watch Descriptor to update. Also accepts a list of
                    watch descriptors.
@@ -1968,18 +1998,18 @@ class WatchManager:
         @param mask: Optional new bitmask of events.
         @type mask: int
         @param proc_fun: Optional new processing function.
-        @type proc_fun: function or ProcessEvent instance or instance of
-                        one of its subclasses or callable object.
+        @type proc_fun: function or :py:class:`ProcessEvent` instance or
+                        instance of one of its subclasses or callable object.
         @param rec: Optionally adds watches recursively on all
-                    subdirectories contained into |wd| directory.
+                    subdirectories contained into `wd` directory.
         @type rec: bool
         @param auto_add: Automatically adds watches on newly created
-                         directories in the watch's path corresponding to |wd|.
-                         If |auto_add| is True, IN_CREATE is ored with |mask|
-                         when the watch is updated.
+                         directories in the watch's path corresponding to `wd`.
+                         If `auto_add` is True, IN_CREATE is is used in a
+                         bitmask with `mask` when the watch is updated.
         @type auto_add: bool
-        @param quiet: If False raises a WatchManagerError exception on
-                      error. See example not_quiet.py
+        @param quiet: If False raises a :py:class:`WatchManagerError` exception
+                      on error.
         @type quiet: bool
         @return: dict of watch descriptors associated to booleans values.
                  True if the corresponding wd has been successfully
@@ -2044,7 +2074,8 @@ class WatchManager:
         """
         Returns the watch descriptor associated to path. This method
         presents a prohibitive cost, always prefer to keep the WD
-        returned by add_watch(). If the path is unknown it returns None.
+        returned by :py:func:`add_watch()`. If the path is unknown it returns
+        None.
 
         @param path: Path.
         @type path: str
@@ -2097,8 +2128,8 @@ class WatchManager:
         @param rec: Recursively removes watches on every already watched
                     subdirectories and subfiles.
         @type rec: bool
-        @param quiet: If False raises a WatchManagerError exception on
-                      error. See example not_quiet.py
+        @param quiet: If False raises a :py:class:`WatchManagerError` exception
+        on error.
         @type quiet: bool
         @return: dict of watch descriptors associated to booleans values.
                  True if the corresponding wd has been successfully
@@ -2146,13 +2177,12 @@ class WatchManager:
         @type filename: string
         @param mask: Bitmask of events, should contain IN_CREATE and IN_DELETE.
         @type mask: int
-        @param proc_class: ProcessEvent (or of one of its subclass), beware of
+        @param proc_class: :py:class:`ProcessEvent` (or of one of its subclass), beware of
                            accepting a ProcessEvent's instance as argument into
-                           __init__, see transient_file.py example for more
-                           details.
+                           __init__.
         @type proc_class: ProcessEvent's instance or of one of its subclasses.
-        @return: Same as add_watch().
-        @rtype: Same as add_watch().
+        @return: Same as :py:func:`add_watch()`.
+        @rtype: Same as :py:func:`add_watch()`.
         """
         dirname = os.path.dirname(filename)
         if dirname == '':
@@ -2234,8 +2264,8 @@ class ColoredOutputFormat(RawOutputFormat):
 
 def command_line():
     """
-    By default the watched path is '/tmp' and all types of events are
-    monitored. Events monitoring serves forever, type c^c to stop it.
+    By default the watched path is your temp directory and all types of events
+    are monitored. Events monitoring runs forever; type Ctrl-C to stop it.
     """
 
     usage = "usage: %prog [options] [path1] [path2] [pathn]"

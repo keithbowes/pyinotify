@@ -24,18 +24,20 @@
 ### Get version 0.9.6 from PyPI and install it with `pip`
 
     # To install pip follow http://www.pip-installer.org/en/latest/installing.html
-    $ pip install pyinotify
+    $ python3 -m pip install pyinotify
 
 ### Alternatively, get the elephant fork
 
-    $ pip install pyinotify-elephant-fork
+    $ python3 -m pip install pyinotify-elephant-fork
 
 ### Or install pyinotify directly from source
 
     $ make deps install
 
+It can also be installed directly into somewhere in your PATH, if you only need the CLI and not the Python API.
+
 ## Watch a directory
 
 Install pyinotify and run this command from a shell:
 
-    $ python -m pyinotify -v /my-dir-to-watch
+    $ pyinotify -v /my-dir-to-watch
